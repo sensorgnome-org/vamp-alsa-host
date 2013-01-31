@@ -235,6 +235,8 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       */
 
       src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
+      step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
+      src0 += step * offset;
 
       for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); ++ir) {
         // FIXME: big assumptions here:
