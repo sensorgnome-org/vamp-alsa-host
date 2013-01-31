@@ -2,7 +2,7 @@
 
 void PluginRunner::delete_privates() {
   if (inputSource)
-    inputSource->removePlugin(this);
+    inputSource->removePluginRunner(this);
   if (plugin) {
     delete plugin;
   }
@@ -31,7 +31,7 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
     return 1;
   }
 
-  // make sure the plugin is compatible: it must run in the time domain and accept 2 channels
+  // make sure the plugin is compatible: it must run in the time domain and accept an appropriate number of channels
         
   if (plugin->getInputDomain() != Plugin::TimeDomain
       || plugin->getMinChannelCount() > numChan
@@ -98,8 +98,8 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
   // value, then set MAX_BUFFER_SIZE to that value.  Output from each call to the plugin's
   // process() method is guaranteed to be no larger than MAX_BUFFER_SIZE bytes.
 
-  ParameterList plist = plugin->getParameterDescriptors();
-  for (ParameterList::iterator ipa = plist.begin(); ipa != plist.end(); ++ipa) {
+  PluginBase::ParameterList plist = plugin->getParameterDescriptors();
+  for (PluginBase::ParameterList::iterator ipa = plist.begin(); ipa != plist.end(); ++ipa) {
     if (ipa->identifier == "isForVampAlsaHost") {
       plugin->setParameter(ipa->identifier, 1.0);
     } else if (ipa->identifier == "isOutputBinary" && ipa->isQuantized &&
@@ -115,12 +115,14 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
   return 0;
 };
 
-PluginRunner::PluginRunner(string &label, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, double timeNow):
+PluginRunner::PluginRunner(string &label, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, double timeNow, int numChan, int rate):
   label(label),
   pluginSOName(pluginSOName),
   pluginID(pluginID),
   pluginOutput(pluginOutput),
   pluginParams(ps),
+  numChan(numChan),
+  rate(rate),
   totalFeatures(0),
   plugin(0),
   plugbuf(0),
@@ -133,11 +135,6 @@ PluginRunner::PluginRunner(string &label, string &pluginSOName, string &pluginID
   bytesInBuffer(0),
   outputFD(-1)
 {
-  if (open()) {
-    // there was an error, so throw an exception
-    delete_privates();
-    throw std::runtime_error("Could not open audio device or could not set required parameters");
-  }
 
   // try load the plugin and throw if we fail
 
@@ -145,8 +142,6 @@ PluginRunner::PluginRunner(string &label, string &pluginSOName, string &pluginID
     delete_privates();
     throw std::runtime_error("Could not load plugin or plugin is not compatible");
   }
-
-  stopTimestamp = now();  // mark time device was opened
 };
 
 PluginRunner::~PluginRunner() {
@@ -155,7 +150,7 @@ PluginRunner::~PluginRunner() {
 
 void PluginRunner::setInputSource(AlsaMinder *am) {
   inputSource = am;
-  am->addPlugin(this);
+  am->addPluginRunner(this);
 };
 
 void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *src1, int step, long long totalFrames, long long frameOfTimestamp, double frameTimestamp) {
@@ -190,7 +185,7 @@ void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *s
       // time to call the plugin
 
       RealTime rt = RealTime::fromSeconds( frameTimestamp + (totalFrames - blockSize - frameOfTimestamp) / (double) rate);
-      getFeaturesToBuffer(plugin->process(plugbuf, rt), label));
+      getFeaturesToBuffer(plugin->process(plugbuf, rt), label);
 
     // shift samples if we're not advancing by a full
     // block.
@@ -222,19 +217,19 @@ void
 PluginRunner::getFeaturesToBuffer(Plugin::FeatureSet features, string prefix)
 {
   ostringstream txt;
-  *totalFeatures += features[outputNo].size();
-  int available = OUTPUT_BUFFER_SIZE - bytesInBuffer;
+  totalFeatures += features[outputNo].size();
+  int available = outputBufferSize - bytesInBuffer;
   for (Plugin::FeatureList::iterator f = features[outputNo].begin(), g = features[outputNo].end(); f != g; ++f ) {
     if (isOutputBinary) {
       // copy values as raw bytes
-      int needed = std::min(OUTPUT_BUFFER_SIZE, values.length * sizeof(float));
+      int needed = std::min((int) outputBufferSize, (int) (f->values.size() * sizeof(float)));
       int shortby = needed - available;
       if (shortby > 0) {
         // discard old data
-        memmove(& outputBuffer, & outputBuffer[shortBy], bytesInBuffer - shortBy);
-        bytesInBuffer -= shortBy;
+        memmove(& outputBuffer, & outputBuffer[shortby], bytesInBuffer - shortby);
+        bytesInBuffer -= shortby;
       }
-      char * src = (char *) (f->values[0]);
+      char * src = (char *) & (f->values[0]);
       memcpy(& outputBuffer[bytesInBuffer], src, needed);
       bytesInBuffer += needed;
       available -= needed;
@@ -266,7 +261,7 @@ PluginRunner::getFeaturesToBuffer(Plugin::FeatureSet features, string prefix)
   if (! isOutputBinary) {
     // add strings to buffer, but any discard of old data must be entire lines
     int size = txt.tellp();
-    int needed = std::min(OUTPUT_BUFFER_SIZE, size());
+    int needed = std::min(outputBufferSize, size);
     int shortby = needed - available;
     char *firstToUse = outputBuffer;
     while (shortby > 0) {
@@ -287,4 +282,5 @@ PluginRunner::getFeaturesToBuffer(Plugin::FeatureSet features, string prefix)
   }
 }
 
+PluginLoader *PluginRunner::pluginLoader = 0;
 

@@ -123,9 +123,6 @@
 #include <signal.h>
 #include <inttypes.h>
 
-#include <sys/socket.h>
-#include <netinet/in.h>
-
 using namespace std;
 
 using Vamp::Plugin;
@@ -139,8 +136,6 @@ using Vamp::HostExt::PluginInputDomainAdapter;
 #include "ParamSet.hpp"
 
 static int serverPortNum = 0xbd09;            // port on which we listen for TCP connections
-static struct pollfd listenerPollfd;          // file descriptor for the socket listener
-static struct pollfd connectionPollfd;        // file descriptor for the TCP connection
 
 static const string appname="vamp-alsa-host";
 static const string commandHelp =         
@@ -219,7 +214,7 @@ now(bool is_monotonic = true) {
 #include "Pollable.hpp"
 #include "PollableMinder.hpp"
 #include "VAHListener.hpp"
-#include "VAHConnection.cpp" // FIXME!
+#include "VAHConnection.hpp"
 
 static PluginLoader *pluginLoader = 0;
 
@@ -230,13 +225,15 @@ typedef std::map < string, AlsaMinder *> AlsaMinderNamedSet;
 typedef std::map < string, PluginRunner *> PluginRunnerNamedSet;
 typedef std::set < VAHConnection *> VAHConnectionSet;
 
-#include "PluginRunner.cpp"  // FIXME!
-#include "AlsaMinder.cpp"    // FIXME!
+#include "PluginRunner.hpp"
+#include "AlsaMinder.hpp"
 
-static AlsaMinderNamedSet allAlsas; // so we can access it via the signal handler
+// this is the owner of all pollabel objects:  AlsaMinders, VAHConnections, and VAHListeners
+static PollableMinder minder;
+
+static AlsaMinderNamedSet alsas;         // does not own objects pointed to by members
 static PluginRunnerNamedSet allPlugins;
 
-static PollableMinder minder;
 
 #define HOST_VERSION "1.4"
 
@@ -277,21 +274,142 @@ terminate (int p)
         return;
     terminating = true;
 
-    for (AlsaMinderSet::iterator fcdi = alsas.begin(); fcdi != alsas.end(); ++fcdi) {
+    for (AlsaMinderNamedSet::iterator fcdi = alsas.begin(); fcdi != alsas.end(); ++fcdi) {
         AlsaMinder *fcd = fcdi->second;
         delete fcd;
         fcdi->second = 0;
     }
 
-    if (listenerPollfd.fd > 0)
-        close(listenerPollfd.fd);
-    if (connectionPollfd.fd > 0)
-        close(connectionPollfd.fd);
-
+    
     cerr << appname << " terminated with signal or code " << p << endl;
 
     exit(p);
 }
+
+
+
+
+void run(PollableMinder & minder)
+{
+    cout << setprecision(3);
+
+    int rv;
+    do {
+        rv = minder.poll(10000);
+    } while (rv == 0);
+    terminate(rv);
+}
+
+
+string runCommand(string cmdString) {
+    ostringstream reply;
+    string word;
+    istringstream cmd(cmdString);
+    double timeNow = now();
+    if (! (cmd >> word))
+        return reply.str();
+    if (word == "stopAll") {
+        // quick stop of all devices
+        struct timespec t;
+        t.tv_sec = 0;
+        t.tv_nsec = 50 * 1000 * 1000;
+        for (AlsaMinderNamedSet::iterator fcdi = alsas.begin(); fcdi != alsas.end(); ++fcdi) {
+            fcdi->second->requestStop(timeNow);
+            // sleep 50 ms between stops
+            nanosleep(&t, 0);
+        }
+        nanosleep (&t, 0);
+        reply << "{\"message\":\"All devices stopped.\"}";
+        minder.requestPollFDRegen();
+    } else if (word == "startAll") {
+        struct timespec t;
+        t.tv_sec = 0;
+        t.tv_nsec = 500 * 1000 * 1000;
+        for (AlsaMinderNamedSet::iterator fcdi = alsas.begin(); fcdi != alsas.end(); ++fcdi) {
+            fcdi->second->requestStart(timeNow);
+            // sleep 500 ms between starts
+            nanosleep(&t, 0);
+        }
+        reply << "{\"message\":\"All devices started.\"}";
+        minder.requestPollFDRegen();
+    } else if (word == "status") {
+        string label;
+        cmd >> label;
+        AlsaMinderNamedSet::iterator fcdi = alsas.find(label);
+        if (fcdi != alsas.end()) {
+            AlsaMinder *fcd = fcdi->second;
+            reply << fcd->toJSON();
+        } else {
+            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
+        }
+    } else if (word == "list") {
+        reply << "{";
+        int i = alsas.size();
+        for (AlsaMinderNamedSet::iterator fcdi = alsas.begin(); fcdi != alsas.end(); ++fcdi, --i) {
+            AlsaMinder *fcd = fcdi->second;
+            reply << "\"" << fcd->label << "\":" << fcd->toJSON() << (i > 1 ? "," : "");
+        }
+        reply << "}";
+    } else if (word == "start" || word == "stop") {
+        string label;
+        cmd >> label;
+        bool doStop = word == "stop";
+        AlsaMinderNamedSet::iterator fcdi = alsas.find(label);
+        if (fcdi != alsas.end()) {
+            AlsaMinder *fcd = fcdi->second;
+            if (doStop)
+                fcd->requestStop(timeNow);
+            else
+                fcd->requestStart(timeNow);
+            reply << fcd->toJSON();
+            minder.requestPollFDRegen();
+        } else {
+            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
+        }
+    } else if (word == "open" ) {
+        string label, alsaDev, pluginLib, pluginName, outputName;
+        int rate, numChan;
+        cmd >> label >> alsaDev >> rate >> numChan >> pluginLib >> pluginName >> outputName;
+        string par;
+        float val;
+        ParamSet ps;
+        for (;;) {
+            if (! (cmd >> par >> val))
+                break;
+            ps[par] = val;
+        }
+        try {
+            alsas[label] = new AlsaMinder(alsaDev, rate, numChan, label, timeNow);
+            minder.requestPollFDRegen();
+            reply << alsas[label]->toJSON();
+        } catch (std::runtime_error e) {
+            reply << "{\"error\": \"Error:" << e.what() << "\"}";
+        };
+    } else if (word == "close") {
+        string label;
+        cmd >> label;
+        AlsaMinderNamedSet::iterator fcdi = alsas.find(label);
+        if (fcdi != alsas.end()) {
+            AlsaMinder *fcd = fcdi->second;
+            fcd->requestStop(timeNow);
+            reply << fcd->toJSON();
+            delete fcd;
+            alsas.erase(fcdi);
+        } else {
+            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
+        }
+        minder.requestPollFDRegen();
+    } else if (word == "quit" ) {
+        reply << "{\"message\": \"Terminating server.\"}";
+        terminate(0);
+    } else if (word == "help" ) {
+        reply <<  "Commands:\n" << commandHelp << endl; // NB: don't use JSON for this
+    } else {
+        reply << "{\"error\": \"Error: invalid command\"}";
+    }
+    reply << endl;
+    return reply.str();
+};
 
 int 
 main(int argc, char **argv)
@@ -334,129 +452,9 @@ main(int argc, char **argv)
     signal(SIGFPE, terminate);
     signal(SIGABRT, terminate);
 
+    VAHConnection::setCommandHandler(& runCommand);
 
     minder.add (new VAHListener(serverPortNum));
-
     run(minder);
-}
-
-string runCommand(string cmd) {
-    ostringstream reply;
-    string word;
-    if (! (cmd >> word))
-        return string();
-    if (word == "stopAll") {
-        // quick stop of all devices
-        struct timespec t;
-        t.tv_sec = 0;
-        t.tv_nsec = 50 * 1000 * 1000;
-        for (AlsaMinderSet::iterator fcdi = alsas.begin(); fcdi != alsas.end(); ++fcdi) {
-            fcdi->second->requestStop(timeNow);
-            // sleep 50 ms between stops
-            nanosleep(&t, 0);
-        }
-        nanosleep (&t, 0);
-        reply << "{\"message\":\"All devices stopped.\"}";
-        minder.requestPollFDRegen();
-    } else if (word == "startAll") {
-        struct timespec t;
-        t.tv_sec = 0;
-        t.tv_nsec = 500 * 1000 * 1000;
-        for (AlsaMinderSet::iterator fcdi = alsas.begin(); fcdi != alsas.end(); ++fcdi) {
-            fcdi->second->requestStart(timeNow);
-            // sleep 500 ms between starts
-            nanosleep(&t, 0);
-        }
-        reply << "{\"message\":\"All devices started.\"}";
-        minder.requestPollFDRegen();
-    } else if (word == "status") {
-        string label;
-        cmd >> label;
-        AlsaMinderSet::iterator fcdi = alsas.find(label);
-        if (fcdi != alsas.end()) {
-            AlsaMinder *fcd = fcdi->second;
-            reply << fcd->toJSON();
-        } else {
-            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
-        }
-    } else if (word == "list") {
-        reply << "{";
-        int i = alsas.size();
-        for (AlsaMinderSet::iterator fcdi = alsas.begin(); fcdi != alsas.end(); ++fcdi, --i) {
-            AlsaMinder *fcd = fcdi->second;
-            reply << "\"" << fcd->label << "\":" << fcd->toJSON() << (i > 1 ? "," : "");
-        }
-        reply << "}";
-    } else if (word == "start" || word == "stop") {
-        string label;
-        cmd >> label;
-        bool doStop = word == "stop";
-        AlsaMinderSet::iterator fcdi = alsas.find(label);
-        if (fcdi != alsas.end()) {
-            AlsaMinder *fcd = fcdi->second;
-            if (doStop)
-                fcd->requestStop(timeNow);
-            else
-                fcd->requestStart(timeNow);
-            reply << fcd->toJSON();
-            minder.requestPollFDRegen();
-        } else {
-            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
-        }
-    } else if (word == "open" ) {
-        string label, alsaDev, pluginLib, pluginName, outputName;
-        int rate, numChan;
-        cmd >> label >> alsaDev >> rate >> numChan >> pluginLib >> pluginName >> outputName;
-        string par;
-        float val;
-        ParamSet ps;
-        for (;;) {
-            if (! (cmd >> par >> val))
-                break;
-            ps[par] = val;
-        }
-        try {
-            alsas[label] = new AlsaMinder(alsaDev, rate, numChan, label, pluginLib, pluginName, outputName, ps, timeNow);
-            minder.requestPollFDRegen();
-            reply << alsas[label]->toJSON();
-        } catch (std::runtime_error e) {
-            reply << "{\"error\": \"Error:" << e.what() << "\"}";
-        };
-    } else if (word == "close") {
-        string label;
-        cmd >> label;
-        AlsaMinderSet::iterator fcdi = alsas.find(label);
-        if (fcdi != alsas.end()) {
-            AlsaMinder *fcd = fcdi->second;
-            fcd->requestStop(timeNow);
-            reply << fcd->toJSON();
-            delete fcd;
-            alsas.erase(fcdi);
-        } else {
-            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
-        }
-        minder.requestPollFDRegen();
-    } else if (word == "quit" ) {
-        reply << "{\"message\": \"Terminating server.\"}";
-        terminate(0);
-    } else if (word == "help" ) {
-        reply <<  "Commands:\n" << commandHelp << endl; // NB: don't use JSON for this
-    } else {
-        reply << "{\"error\": \"Error: invalid command\"}";
-    }
-    reply << endl;
-    return reply.str();
-};
-
-
-void run( PollableMinder & minder )
-{
-    cout << setprecision(3);
-
-    int rv = 0;
-    while (! rv) {
-        rv = minder.poll();
-    }
-    terminate(rv);
 }
 

@@ -9,6 +9,15 @@
 #include <set>
 #include <vector>
 #include <map>
+#include <poll.h>
+#include <errno.h>
+#include <string>
+#include <sstream>
+
+using std::string;
+using std::istringstream;
+using std::ostringstream;
+
 class Pollable;
 
 typedef std::set <Pollable *> PollableSet;
@@ -16,11 +25,12 @@ typedef std::set <Pollable *> PollableSet;
 class PollableMinder {
 
 protected:
-  std::vector <struct pollfd> pollfds;
   PollableSet pollables; // maintained in same order as pollfds, but might not be of same length if some objects have more than one FD
+  // this object owns the objects pointed to
+  std::vector <struct pollfd> pollfds;
+  std::map <Pollable *, int > first_pollfd; // map of Pollable * to index of first corresponding struct pollfd in pollfds
   PollableSet deferred_adds;
   PollableSet deferred_removes;
-  std::map <Pollable *, int > first_pollfd; // map of Pollable * to index of first corresponding struct pollfd in pollfds
   bool regen_pollfds;
   bool have_deferrals;
   bool doing_poll;
@@ -38,5 +48,5 @@ protected:
   void doDeferrals();  
   void regenFDs();
 };
-    
+
 #endif // POLLABLEMINDER_HPP

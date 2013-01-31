@@ -79,6 +79,14 @@ int AlsaMinder::requestStart(double timeNow) {
   return start(timeNow);
 };
 
+void AlsaMinder::addPluginRunner(PluginRunner *pr) {
+  plugins.insert(pr);
+};
+
+void AlsaMinder::removePluginRunner(PluginRunner *pr) {
+  plugins.erase(pr);
+};
+
 AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now):
   alsaDev(alsaDev),
   rate(rate),
@@ -146,7 +154,7 @@ int AlsaMinder::getPollFDs (struct pollfd *pollfds) {
   return 0;
 }
 
-void AlsaMinder::handleInput ( struct pollfd *pollfds, bool timedOut, double timeNow, PollableMinder *minder) {
+void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow, PollableMinder *minder) {
   short unsigned revents;
   if (!timedOut) {
     int rv = snd_pcm_poll_descriptors_revents( pcm, pollfds, numFD, & revents);

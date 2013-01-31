@@ -4,6 +4,7 @@
 */
 
 #include "PollableMinder.hpp"
+#include "Pollable.hpp"
 
 PollableMinder::PollableMinder():
   regen_pollfds(false),
@@ -25,6 +26,7 @@ void PollableMinder::add(Pollable *p) {
 void PollableMinder::remove(Pollable *p) {
   if (! doing_poll) {
     pollables.erase(p);
+    delete p;
     regen_pollfds = true;
   } else {
     deferred_removes.insert(p);
@@ -32,13 +34,13 @@ void PollableMinder::remove(Pollable *p) {
   }
 }
 
-void PollableMinder::setEvents(Pollable *p, short events, int offset = 0) {
+void PollableMinder::setEvents(Pollable *p, short events, int offset) {
   // set the events field for a pollable in the set
   // For Pollables with more than one FD, offset can be used
   // to select among them.
-  if (first_pollable.count(p) == 0)
+  if (first_pollfd.count(p) == 0)
     return;
-  pollfds[first_pollable[p] + offset].events = events;
+  pollfds[first_pollfd[p] + offset].events = events;
 };
 
 void PollableMinder::requestPollFDRegen() {
@@ -49,7 +51,7 @@ int PollableMinder::poll(int timeout) {
   doing_poll = true;
 
   regenFDs();
-  int rv = poll(& pollfds[0], pollfds.size(), timeout);
+  int rv = ::poll(& pollfds[0], pollfds.size(), timeout);
   if (rv < 0) {
     doing_poll = false;
     return errno;
@@ -61,8 +63,8 @@ int PollableMinder::poll(int timeout) {
   int i = 0;
   PollableSet to_delete;
   for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
-    is->handleEvents(& pollfds[i], timedOut, regen_pollfds, this);
-    i += is->getNumPollFDs();
+    (*is)->handleEvents(& pollfds[i], timedOut, regen_pollfds, this);
+    i += (*is)->getNumPollFDs();
   }
   doing_poll = false;
   doDeferrals();
@@ -90,9 +92,10 @@ void PollableMinder::regenFDs() {
     for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
       int where = pollfds.size();
       first_pollfd[*is] = where;
-      int numFDs = is->getNumPollFDs();
-      pollfds.reserve(where + numFD);
-      is->getPollFDs(& pollfds[where]);
+      int numFDs = (*is)->getNumPollFDs();
+      pollfds.reserve(where + numFDs);
+      (*is)->getPollFDs(& pollfds[where]);
     }
   }
 }
+

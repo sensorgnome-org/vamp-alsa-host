@@ -24,10 +24,10 @@ public:
   int                rate;             // sampling rate to use for device
   unsigned int       numChan;          // number of channels to read from device
   string             label;            // prefix for lines of output arising from this device, to distinguish them from other devices' output
-  PluginRunnerSet    plugins;          // set of plugins accepting input from this device
 
 protected:
 
+  PluginRunnerSet    plugins;          // set of plugins accepting input from this device
   snd_pcm_t *        pcm;              // handle to open pcm device
   snd_pcm_uframes_t  buffer_frames;    // buffer size given to us by ALSA (we attempt to specify it)
   snd_pcm_uframes_t  period_frames;    // period size given to us by ALSA (we attempt to specify it)
@@ -49,6 +49,8 @@ public:
   void requestStop(double timeNow);
   int start(double timeNow);
   int requestStart(double timeNow);
+  void addPluginRunner(PluginRunner *pr);
+  void removePluginRunner(PluginRunner *pr);
 
   AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now);
 
@@ -62,7 +64,7 @@ public:
 
   virtual int getPollFDs (struct pollfd *pollfds);
 
-  virtual void handleInput ( struct pollfd *pollfds, bool timedOut, double timeNow, PollableMinder *minder);
+  virtual void handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow, PollableMinder *minder);
 
 protected:
   
