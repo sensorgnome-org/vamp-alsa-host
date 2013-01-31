@@ -232,7 +232,7 @@ typedef std::set < VAHConnection *> VAHConnectionSet;
 static PollableMinder minder;
 
 static AlsaMinderNamedSet alsas;         // does not own objects pointed to by members
-static PluginRunnerNamedSet allPlugins;
+static PluginRunnerNamedSet plugins;
 
 
 #define HOST_VERSION "1.4"
@@ -301,7 +301,7 @@ void run(PollableMinder & minder)
 }
 
 
-string runCommand(string cmdString) {
+string runCommand(string cmdString, VAHConnection *conn) {
     ostringstream reply;
     string word;
     istringstream cmd(cmdString);
@@ -367,19 +367,11 @@ string runCommand(string cmdString) {
             reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
         }
     } else if (word == "open" ) {
-        string label, alsaDev, pluginLib, pluginName, outputName;
+        string label, alsaDev;
         int rate, numChan;
-        cmd >> label >> alsaDev >> rate >> numChan >> pluginLib >> pluginName >> outputName;
-        string par;
-        float val;
-        ParamSet ps;
-        for (;;) {
-            if (! (cmd >> par >> val))
-                break;
-            ps[par] = val;
-        }
+        cmd >> label >> alsaDev >> rate >> numChan;
         try {
-            alsas[label] = new AlsaMinder(alsaDev, rate, numChan, label, timeNow);
+            minder.add(alsas[label] = new AlsaMinder(alsaDev, rate, numChan, label, timeNow));
             minder.requestPollFDRegen();
             reply << alsas[label]->toJSON();
         } catch (std::runtime_error e) {
@@ -399,6 +391,28 @@ string runCommand(string cmdString) {
             reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
         }
         minder.requestPollFDRegen();
+    } else if (word == "attach") {
+        string devLabel, pluginLabel, pluginLib, pluginName, outputName;
+        string par;
+        float val;
+        ParamSet ps;
+        cmd >> devLabel >> pluginLabel >> pluginLib >> pluginName >> outputName;
+        for (;;) {
+            if (! (cmd >> par >> val))
+                break;
+            ps[par] = val;
+        }
+        try {
+            AlsaMinderNamedSet::iterator fcdi = alsas.find(devLabel);
+            if (fcdi == alsas.end())
+                throw std::runtime_error(string("There is no device with label '") + devLabel + "'");
+            PluginRunner *plugin = new PluginRunner(pluginLabel, devLabel, fcdi->second->rate, fcdi->second->numChan, pluginLib, pluginName, outputName, ps, conn);
+            plugins[pluginLabel] = plugin;
+            fcdi->second->addPluginRunner(plugin);
+            reply << plugin->toJSON();
+        } catch (std::runtime_error e) {
+            reply << "{\"error\": \"Error:" << e.what() << "\"}";
+        };
     } else if (word == "quit" ) {
         reply << "{\"message\": \"Terminating server.\"}";
         terminate(0);

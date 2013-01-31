@@ -115,14 +115,17 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
   return 0;
 };
 
-PluginRunner::PluginRunner(string &label, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, double timeNow, int numChan, int rate):
+PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, AlsaMinder *inputSource, VAHConnection *outputConnection):
   label(label),
+  devLabel(devLabel),
+  rate(rate),
+  numChan(numChan),
   pluginSOName(pluginSOName),
   pluginID(pluginID),
   pluginOutput(pluginOutput),
   pluginParams(ps),
-  numChan(numChan),
-  rate(rate),
+  inputSource(inputSource),
+  outputConnection(outputConnection),
   totalFeatures(0),
   plugin(0),
   plugbuf(0),
@@ -130,10 +133,7 @@ PluginRunner::PluginRunner(string &label, string &pluginSOName, string &pluginID
   outputNo(-1),
   blockSize(0),
   stepSize(0),
-  inputSource(0),
-  isOutputBinary(false),
-  bytesInBuffer(0),
-  outputFD(-1)
+  isOutputBinary(false)
 {
 
   // try load the plugin and throw if we fail
@@ -185,7 +185,7 @@ void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *s
       // time to call the plugin
 
       RealTime rt = RealTime::fromSeconds( frameTimestamp + (totalFrames - blockSize - frameOfTimestamp) / (double) rate);
-      getFeaturesToBuffer(plugin->process(plugbuf, rt), label);
+      outputFeatures(plugin->process(plugbuf, rt), label);
 
     // shift samples if we're not advancing by a full
     // block.
@@ -214,26 +214,19 @@ void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *s
 };
 
 void
-PluginRunner::getFeaturesToBuffer(Plugin::FeatureSet features, string prefix)
+PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
 {
-  ostringstream txt;
+  if (! outputConnection)
+    return;
+
   totalFeatures += features[outputNo].size();
   int available = outputBufferSize - bytesInBuffer;
   for (Plugin::FeatureList::iterator f = features[outputNo].begin(), g = features[outputNo].end(); f != g; ++f ) {
     if (isOutputBinary) {
       // copy values as raw bytes
-      int needed = std::min((int) outputBufferSize, (int) (f->values.size() * sizeof(float)));
-      int shortby = needed - available;
-      if (shortby > 0) {
-        // discard old data
-        memmove(& outputBuffer, & outputBuffer[shortby], bytesInBuffer - shortby);
-        bytesInBuffer -= shortby;
-      }
-      char * src = (char *) & (f->values[0]);
-      memcpy(& outputBuffer[bytesInBuffer], src, needed);
-      bytesInBuffer += needed;
-      available -= needed;
+      outputConnection->queueOutputBytes((char *)& f->values[0], (int) (f->values.size() * sizeof(float)));
     } else {
+      ostringstream txt;
       RealTime rt;
 
       if (f->hasTimestamp) {
@@ -256,30 +249,22 @@ PluginRunner::getFeaturesToBuffer(Plugin::FeatureSet features, string prefix)
       }
 
       txt << endl;
+      outputConnection->queueOutputString(txt.str());
     }
   }
-  if (! isOutputBinary) {
-    // add strings to buffer, but any discard of old data must be entire lines
-    int size = txt.tellp();
-    int needed = std::min(outputBufferSize, size);
-    int shortby = needed - available;
-    char *firstToUse = outputBuffer;
-    while (shortby > 0) {
-      // advance to start of next line
-      char *endOfFirstLine = strchr(firstToUse, '\n');
-      if (! endOfFirstLine)
-        break;
-      shortby -= endOfFirstLine - firstToUse + 1;
-      firstToUse = endOfFirstLine + 1;
-    }
-    int drop = firstToUse - & outputBuffer[0];
-    if (drop > 0) {
-      bytesInBuffer -= drop;
-      memcpy(& outputBuffer[0], &outputBuffer[drop], bytesInBuffer);
-    }
-    memcpy(& outputBuffer[bytesInBuffer], txt.str().c_str(), needed);
-    bytesInBuffer += size;
-  }
+};
+
+string PluginRunner::toJSON() {
+  ostringstream s;
+  s << "{" 
+    << "\"label\":\"" << label << "\","
+    << "\"devLabel\":\"" << devLabel << "\","
+    << "\"library\":\"" << pluginSOName << "\","
+    << "\"ID\":" << pluginID << ","
+    << "\"output\":" << pluginOutput << ","
+    << "\"totalFeatures\":" << totalFeatures
+    << "}";
+  return s.str();
 }
 
 PluginLoader *PluginRunner::pluginLoader = 0;

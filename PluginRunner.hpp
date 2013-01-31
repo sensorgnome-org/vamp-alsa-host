@@ -14,12 +14,14 @@ using namespace Vamp;
 using namespace Vamp::HostExt;
 
 #include "ParamSet.hpp"
+#include "VAHConnection.hpp"
 
 class AlsaMinder;
 
 class PluginRunner {
 public:
   string             label;            // name of this plugin runner (used in commands)
+  string             devLabel;         // label of device from which plugin receives input
   string             pluginSOName;     // name of shared object where plugin resides
   string             pluginID;         // id of plugin
   string             pluginOutput;     // name of output to obtain from plugin
@@ -42,18 +44,17 @@ protected:
   // the oldest output is discarded line by line, so that any output line
   // is either completely written or not written at all.  For binary output,
   // we just discard at arbitrary boundaries.
-  int                outputBufferSize; // number of chars in outputBuffer
-  char *             outputBuffer;     // buffer for output
-  int                bytesInBuffer;    // number of bytes in buffer
-  int                outputFD;         // output file descriptor (typically a socket)
+
+  VAHConnection *    outputConnection; // connection to which output is written
 
 public:
-  PluginRunner(string &label, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, double timeNow, int numChan, int rate);
+  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, VAHConnection *outputConnection);
   ~PluginRunner();
   int loadPlugin(ParamSet &ps);
   void setInputSource(AlsaMinder *am);
   void handleData(long avail, int16_t *src0, int16_t *src1, int step, long long totalFrames, long long frameOfTimestamp, double frameTimestamp);
-  void getFeaturesToBuffer(Plugin::FeatureSet features, string prefix);
+  void outputFeatures(Plugin::FeatureSet features, string prefix);
+  string toJSON();
 
 private:
   void delete_privates();

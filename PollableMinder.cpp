@@ -93,7 +93,7 @@ void PollableMinder::regenFDs() {
       int where = pollfds.size();
       first_pollfd[*is] = where;
       int numFDs = (*is)->getNumPollFDs();
-      pollfds.reserve(where + numFDs);
+      pollfds.resize(where + numFDs);
       (*is)->getPollFDs(& pollfds[where]);
     }
   }
