@@ -6,7 +6,7 @@ int VAHListener::getPollFDs (struct pollfd * pollfds) {
   * pollfds = pollfd;
 };
 
-void VAHListener::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow, PollableMinder *minder) {
+void VAHListener::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
   // accept a connection
   if (pollfds->revents & (POLLIN | POLLPRI)) {
     struct sockaddr_in cli_addr;
@@ -14,12 +14,13 @@ void VAHListener::handleEvents (struct pollfd *pollfds, bool timedOut, double ti
     socklen_t clilen = sizeof(cli_addr);
     int conn_fd = accept4(pollfd.fd, (struct sockaddr *) &cli_addr, &clilen, SOCK_NONBLOCK);
     if (conn_fd >= 0) {
-      minder->add(new VAHConnection(conn_fd));
+      minder->add(new VAHConnection(conn_fd, minder));
     }
   }
 };
 
-VAHListener::VAHListener(int server_port_num) : 
+VAHListener::VAHListener(int server_port_num, PollableMinder *minder) : 
+  Pollable(minder),
   server_port_num(server_port_num),
   SO_REUSEADDR_ON(1) 
 {

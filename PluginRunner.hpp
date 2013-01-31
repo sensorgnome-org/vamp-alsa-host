@@ -48,7 +48,7 @@ protected:
   VAHConnection *    outputConnection; // connection to which output is written
 
 public:
-  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, VAHConnection *outputConnection);
+  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, AlsaMinder *inputSource, VAHConnection *outputConnection);
   ~PluginRunner();
   int loadPlugin(ParamSet &ps);
   void setInputSource(AlsaMinder *am);

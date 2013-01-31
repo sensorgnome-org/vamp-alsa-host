@@ -49,6 +49,7 @@ int AlsaMinder::open() {
 };
 
 void AlsaMinder::stop(double timeNow) {
+  minder->requestPollFDRegen();
   if (pcm) {
     snd_pcm_drop(pcm);
     snd_pcm_close(pcm);
@@ -66,6 +67,7 @@ void AlsaMinder::requestStop(double timeNow) {
 int AlsaMinder::start(double timeNow) {
   if (!pcm && open())
     return 1;
+  minder->requestPollFDRegen();
   snd_pcm_prepare(pcm);
   hasError = 0;
   snd_pcm_start(pcm);
@@ -87,12 +89,23 @@ void AlsaMinder::removePluginRunner(PluginRunner *pr) {
   plugins.erase(pr);
 };
 
-AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now):
+void AlsaMinder::addRawListener(VAHConnection *conn) {
+  rawListeners.insert(conn);
+};
+
+void AlsaMinder::removeRawListener(VAHConnection *conn) {
+  rawListeners.erase(conn);
+};
+
+void AlsaMinder::removeAllRawListeners() {
+  rawListeners.clear();
+};
+
+AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, PollableMinder *minder):
   alsaDev(alsaDev),
   rate(rate),
   numChan(numChan),
   label(label),
-  plugins(),
   pcm(0),
   buffer_frames(BUFFER_FRAMES),
   period_frames(PERIOD_FRAMES),
@@ -103,7 +116,8 @@ AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &
   shouldBeRunning(false),
   stopped(true),
   hasError(0),
-  numFD(0)
+  numFD(0),
+  Pollable(minder)
 {
   if (open()) {
     // there was an error, so throw an exception
@@ -139,7 +153,7 @@ string AlsaMinder::toJSON() {
 }
 
 int AlsaMinder::getNumPollFDs () {
-  return numFD;
+  return (pcm && shouldBeRunning) ? numFD : 0;
 };
 
 int AlsaMinder::getPollFDs (struct pollfd *pollfds) {
@@ -154,7 +168,9 @@ int AlsaMinder::getPollFDs (struct pollfd *pollfds) {
   return 0;
 }
 
-void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow, PollableMinder *minder) {
+void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow) {
+  if (!pcm)
+    return;
   short unsigned revents;
   if (!timedOut) {
     int rv = snd_pcm_poll_descriptors_revents( pcm, pollfds, numFD, & revents);
@@ -215,6 +231,21 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       int step;
 
       /*
+        if a raw output connection exists, queue the new data onto it
+      */
+
+      src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
+
+      for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); ++ir) {
+        // FIXME: big assumptions here:
+        // - S16_LE sample format
+        // - samples occupy a contiguous area of memory, starting at the first byte
+        //   of the first sample on channel 0
+
+        (*ir)->queueRawOutput((char *) src0, avail * numChan * 2, numChan * 2);
+      }
+
+      /*
       copy from ALSA mmap buffers to each attached plugin's buffer,
       converting from S16_LE to float, and calling the plugin if its
       buffer has reached blocksize
@@ -224,7 +255,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         // we are going out on a limb and assuming the step is the same for both channels
 
         src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
-        step = areas[0].step / 16;
+        step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
         src0 += step * offset;
                     
         if (numChan == 2) {

@@ -139,11 +139,12 @@ static int serverPortNum = 0xbd09;            // port on which we listen for TCP
 
 static const string appname="vamp-alsa-host";
 static const string commandHelp =         
-    "       open LABEL AUDIO_DEV RATE NUM_CHANNELS\n"
+    "       open DEV_LABEL AUDIO_DEV RATE NUM_CHANNELS\n"
     "          Opens an audio device so that plugins can be attached to it.\n"
-    "          To start processing, you must attach a plugin and start the device 'start LABEL' command - see below\n"
+    "          To start processing, you must attach a plugin and start the device\n"
+    "          using the 'start DEV_LABEL' command - see below\n\n"
     "          Arguments:\n"
-    "          LABEL: a label which will identify this audio device in subsequent commands\n"
+    "          DEV_LABEL: a label which will identify this audio device in subsequent commands\n"
     "             and in output lines\n"
     "          AUDIO_DEV: the ALSA name of the audio device (e.g. 'default:CARD=V10')\n"
     "          RATE: the sampling rate to use for the device (e.g. 48000)\n"
@@ -161,29 +162,44 @@ static const string commandHelp =
     "                       PAR: is the name of a plugin parameter\n"
     "                       VALUE: is the value to be assiged to the parameter\n\n"
     "          e.g. attach 3 pulse3 lotek-plugins.so findpulsefdbatch pulses minsnr=6\n\n"
+    "          Output from the plugin will be sent to the TCP connection which issued the 'attach' command\n\n"
+    
+    "       rawOn DEV_LABEL\n"
+    "          Raw data from the device DEV_LABEL will be sent to the issuing TCP connection\n"
+    "          once the device is started, independently of any plugin processing.\n\n"
+    
+    "       rawOff DEV_LABEL\n"
+    "          Stop sending raw data from the device DEV_LABEL to the issuing TCP connection.\n\n"
 
-    "       start LABEL\n"
-    "          Begin acquiring data from the audio device identified by LABEL.\n"
+    "       rawNone DEV_LABEL\n"
+    "          Do not send raw data from the device DEV_LABEL to *any* TCP connections.\n\n"
+    
+    "       start DEV_LABEL\n"
+    "          Begin acquiring data from the audio device identified by DEV_LABEL.\n"
     "          This must already have been created using an 'open' command.\n"
     "          Data are read from device LABEL, and passed to any attached plugins.\n"
-    "          Output from a plugin instance is sent to the socket from which the\n"
-    "          corresponding 'start' command was issued.\n\n"
+    "          Output from each plugin instance is sent to the socket from which the\n"
+    "          corresponding 'attach' command was issued.\n\n"
 
-    "       stop LABEL\n"
-    "          Stop acquiring data from the audio device identified by LABEL.\n\n"
+    "       stop DEV_LABEL\n"
+    "          Stop acquiring data from the audio device identified by DEV_LABEL.\n\n"
 
     "Note: start and stop commands can be sent repeatedly for a device which has been opened.\n"
     "The associated plugin will see a continuous stream of data, albeit with timestamps\n"
     "reflecting the loss of data between stop and (re)start.  The same applies to startAll and stopAll.\n"
     "To re-start a plugin completely, you must close the device and re-open it.\n\n"
 
-    "       close LABEL\n"
+    "       close DEV_LABEL\n"
     "           Stop acquiring data from the device and shut it down.  This deletes\n"
-    "           the device from the server, so that LABEL cannot be used in subsequent commands\n"
-    "           until another 'open LABEL...' command is sent.\n\n"
+    "           the device from the server, so that DEV_LABEL cannot be used in subsequent commands\n"
+    "           until another 'open DEV_LABEL...' command is sent.\n\n"
 
     "       status LABEL\n"
-    "           Report on the status of the audio device or plugin identified by LABEL\n"
+    "           Report on the status of the audio device identified by LABEL\n"
+    "           The reply is a JSON object.\n\n"
+
+    "       pstatus LABEL\n"
+    "           Report on the status of plugin identified by LABEL\n"
     "           The reply is a JSON object.\n\n"
 
     "       stopAll\n"
@@ -295,7 +311,7 @@ void run(PollableMinder & minder)
 
     int rv;
     do {
-        rv = minder.poll(10000);
+        rv = minder.poll(10000, now);
     } while (rv == 0);
     terminate(rv);
 }
@@ -366,12 +382,28 @@ string runCommand(string cmdString, VAHConnection *conn) {
         } else {
             reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
         }
+    } else if (word == "rawOn" || word == "rawOff" || word == "rawNone") {
+        string label;
+        cmd >> label;
+        AlsaMinderNamedSet::iterator fcdi = alsas.find(label);
+        if (fcdi != alsas.end()) {
+            AlsaMinder *fcd = fcdi->second;
+            if (word == "rawOn") {
+                fcd->addRawListener(conn);
+            } else if (word == "rawOff") {
+                fcd->removeRawListener(conn);
+            } else {
+                fcd->removeAllRawListeners();
+            }
+        } else {
+            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
+        }
     } else if (word == "open" ) {
         string label, alsaDev;
         int rate, numChan;
         cmd >> label >> alsaDev >> rate >> numChan;
         try {
-            minder.add(alsas[label] = new AlsaMinder(alsaDev, rate, numChan, label, timeNow));
+            minder.add(alsas[label] = new AlsaMinder(alsaDev, rate, numChan, label, timeNow, & minder));
             minder.requestPollFDRegen();
             reply << alsas[label]->toJSON();
         } catch (std::runtime_error e) {
@@ -406,7 +438,7 @@ string runCommand(string cmdString, VAHConnection *conn) {
             AlsaMinderNamedSet::iterator fcdi = alsas.find(devLabel);
             if (fcdi == alsas.end())
                 throw std::runtime_error(string("There is no device with label '") + devLabel + "'");
-            PluginRunner *plugin = new PluginRunner(pluginLabel, devLabel, fcdi->second->rate, fcdi->second->numChan, pluginLib, pluginName, outputName, ps, conn);
+            PluginRunner *plugin = new PluginRunner(pluginLabel, devLabel, fcdi->second->rate, fcdi->second->numChan, pluginLib, pluginName, outputName, ps, fcdi->second, conn);
             plugins[pluginLabel] = plugin;
             fcdi->second->addPluginRunner(plugin);
             reply << plugin->toJSON();
@@ -468,7 +500,7 @@ main(int argc, char **argv)
 
     VAHConnection::setCommandHandler(& runCommand);
 
-    minder.add (new VAHListener(serverPortNum));
+    minder.add (new VAHListener(serverPortNum, &minder));
     run(minder);
 }
 

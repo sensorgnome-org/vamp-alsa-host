@@ -23,9 +23,9 @@ class VAHListener : public Pollable {
                       // return number of fds used by this Pollable (negative means error)
   int getPollFDs (struct pollfd * pollfds);
 
-  void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow, PollableMinder *minder);
+  void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
-  VAHListener(int server_port_num);
+  VAHListener(int server_port_num, PollableMinder * minder);
 };
 
 #endif // VAHLISTENER_HPP

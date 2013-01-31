@@ -220,13 +220,15 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
     return;
 
   totalFeatures += features[outputNo].size();
-  int available = outputBufferSize - bytesInBuffer;
   for (Plugin::FeatureList::iterator f = features[outputNo].begin(), g = features[outputNo].end(); f != g; ++f ) {
     if (isOutputBinary) {
       // copy values as raw bytes
-      outputConnection->queueOutputBytes((char *)& f->values[0], (int) (f->values.size() * sizeof(float)));
+      outputConnection->queueFloatOutput(f->values);
     } else {
       ostringstream txt;
+      txt.setf(ios::fixed,ios::floatfield);
+      txt.precision(4); // 0.1 ms precision for timestamp
+
       RealTime rt;
 
       if (f->hasTimestamp) {
@@ -235,9 +237,8 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
 
       if (prefix.length())
         txt << prefix << ",";
-      txt << setprecision(14);
       txt << (double) (rt.sec + rt.nsec / (double) 1.0e9);
-      txt << setprecision(3);
+      txt.unsetf(ios::floatfield); // now 4 digits total precision
 
       if (f->hasDuration) {
         rt = f->duration;
@@ -249,7 +250,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
       }
 
       txt << endl;
-      outputConnection->queueOutputString(txt.str());
+      outputConnection->queueTextOutput(txt.str());
     }
   }
 };

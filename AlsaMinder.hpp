@@ -11,6 +11,9 @@ using namespace std;
 
 #include "Pollable.hpp"
 #include "PluginRunner.hpp"
+#include "VAHConnection.hpp"
+
+typedef std::set < VAHConnection * > RawListenerSet;
 
 class AlsaMinder : public Pollable {
 public:
@@ -28,6 +31,7 @@ public:
 protected:
 
   PluginRunnerSet    plugins;          // set of plugins accepting input from this device
+  RawListenerSet     rawListeners;     // connections receiving raw output from this device, if any.
   snd_pcm_t *        pcm;              // handle to open pcm device
   snd_pcm_uframes_t  buffer_frames;    // buffer size given to us by ALSA (we attempt to specify it)
   snd_pcm_uframes_t  period_frames;    // period size given to us by ALSA (we attempt to specify it)
@@ -51,8 +55,11 @@ public:
   int requestStart(double timeNow);
   void addPluginRunner(PluginRunner *pr);
   void removePluginRunner(PluginRunner *pr);
+  void addRawListener(VAHConnection *conn);
+  void removeRawListener(VAHConnection *conn);
+  void removeAllRawListeners();
 
-  AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now);
+  AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, PollableMinder * minder);
 
   ~AlsaMinder();
 
@@ -64,7 +71,7 @@ public:
 
   virtual int getPollFDs (struct pollfd *pollfds);
 
-  virtual void handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow, PollableMinder *minder);
+  virtual void handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow);
 
 protected:
   

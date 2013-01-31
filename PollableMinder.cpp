@@ -34,20 +34,21 @@ void PollableMinder::remove(Pollable *p) {
   }
 }
 
-void PollableMinder::setEvents(Pollable *p, short events, int offset) {
+short& PollableMinder::eventsOf(Pollable *p, int offset) {
+
   // set the events field for a pollable in the set
   // For Pollables with more than one FD, offset can be used
   // to select among them.
   if (first_pollfd.count(p) == 0)
-    return;
-  pollfds[first_pollfd[p] + offset].events = events;
+    throw std::runtime_error("PollableMinder::eventsOf: No such pollable in minder.\n");
+  return pollfds[first_pollfd[p] + offset].events;
 };
 
 void PollableMinder::requestPollFDRegen() {
   regen_pollfds = true;
 };
 
-int PollableMinder::poll(int timeout) {
+int PollableMinder::poll(int timeout, double (*now)(bool isRealtime)) {
   doing_poll = true;
 
   regenFDs();
@@ -63,8 +64,10 @@ int PollableMinder::poll(int timeout) {
   int i = 0;
   PollableSet to_delete;
   for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
-    (*is)->handleEvents(& pollfds[i], timedOut, regen_pollfds, this);
-    i += (*is)->getNumPollFDs();
+    PollableIndex::iterator ip = first_pollfd.find(*is);
+    if (ip == first_pollfd.end())
+      continue;
+    (*is)->handleEvents(&pollfds[ip->second], timedOut, (*now)(false));
   }
   doing_poll = false;
   doDeferrals();
@@ -91,10 +94,12 @@ void PollableMinder::regenFDs() {
     first_pollfd.clear();
     for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
       int where = pollfds.size();
-      first_pollfd[*is] = where;
       int numFDs = (*is)->getNumPollFDs();
-      pollfds.resize(where + numFDs);
-      (*is)->getPollFDs(& pollfds[where]);
+      if (numFDs > 0) {
+        first_pollfd[*is] = where;
+        pollfds.resize(where + numFDs);
+        (*is)->getPollFDs(& pollfds[where]);
+      }
     }
   }
 }
