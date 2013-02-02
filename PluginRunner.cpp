@@ -115,7 +115,7 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
   return 0;
 };
 
-PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, AlsaMinder *inputSource, VAHConnection *outputConnection):
+PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, AlsaMinder *inputSource, TCPConnection *outputConnection):
   label(label),
   devLabel(devLabel),
   rate(rate),

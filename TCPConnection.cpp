@@ -1,6 +1,6 @@
-#include "VAHConnection.hpp"
+#include "TCPConnection.hpp"
 
-VAHConnection::VAHConnection (int fd, PollableMinder * minder) : 
+TCPConnection::TCPConnection (int fd, PollableMinder * minder) : 
   Pollable(minder),
   outputLineBuffer(MAX_OUTPUT_LINE_BUFFER_SIZE),
   outputFloatBuffer(MAX_OUTPUT_FLOAT_BUFFER_SIZE),
@@ -11,30 +11,30 @@ VAHConnection::VAHConnection (int fd, PollableMinder * minder) :
   
 };
   
-int VAHConnection::getPollFDs (struct pollfd * pollfds) {
+int TCPConnection::getPollFDs (struct pollfd * pollfds) {
   * pollfds = pollfd;
   return 0;
 };
 
-void VAHConnection::queueFloatOutput(std::vector < float > & f) {
+void TCPConnection::queueFloatOutput(std::vector < float > & f) {
   outputFloatBuffer.insert(outputFloatBuffer.end(), f.begin(), f.end());
   pollfd.events = minder->eventsOf(this) |= POLLOUT;
 };
 
-void VAHConnection::queueTextOutput(string s) {
+void TCPConnection::queueTextOutput(string s) {
   if (s.length() == 0)
     return;
   outputLineBuffer.push_back(s);
   pollfd.events = minder->eventsOf(this) |= POLLOUT;
 };
 
-void VAHConnection::queueRawOutput(const char *p, int len, int granularity) {
+void TCPConnection::queueRawOutput(const char *p, int len, int granularity) {
   outputRawBuffer.insert(outputRawBuffer.end(), p, p+len);
   outputRawBufferGranularity = granularity;
   pollfd.events = minder->eventsOf(this) |= POLLOUT;
 };
     
-void VAHConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
+void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
 
   // set whether or not to watch for POLLOUT
   // kludgey to do it here, but this has access to the PollableMinder's
@@ -140,8 +140,8 @@ void VAHConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
   }
 };
 
-void VAHConnection::setCommandHandler (CommandHandler commandHandler) {
-  VAHConnection::commandHandler = commandHandler;
+void TCPConnection::setCommandHandler (CommandHandler commandHandler) {
+  TCPConnection::commandHandler = commandHandler;
 };
 
-CommandHandler VAHConnection::commandHandler = 0;
+CommandHandler TCPConnection::commandHandler = 0;

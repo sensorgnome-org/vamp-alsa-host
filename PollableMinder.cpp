@@ -15,7 +15,7 @@ PollableMinder::PollableMinder():
   
 void PollableMinder::add(Pollable *p) {
   if (! doing_poll) {
-    pollables.insert(p);
+    pollables.insert(unique_ptr < Pollable > (p));
     regen_pollfds = true;
   } else {
     deferred_adds.insert(p);
@@ -23,7 +23,7 @@ void PollableMinder::add(Pollable *p) {
   }
 }
   
-void PollableMinder::remove(Pollable *p) {
+void PollableMinder::remove(unique_ptr < Pollable > p) {
   if (! doing_poll) {
     pollables.erase(p);
     delete p;

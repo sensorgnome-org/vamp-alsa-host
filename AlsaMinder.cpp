@@ -89,11 +89,11 @@ void AlsaMinder::removePluginRunner(PluginRunner *pr) {
   plugins.erase(pr);
 };
 
-void AlsaMinder::addRawListener(VAHConnection *conn) {
+void AlsaMinder::addRawListener(TCPConnection *conn) {
   rawListeners.insert(conn);
 };
 
-void AlsaMinder::removeRawListener(VAHConnection *conn) {
+void AlsaMinder::removeRawListener(TCPConnection *conn) {
   rawListeners.erase(conn);
 };
 

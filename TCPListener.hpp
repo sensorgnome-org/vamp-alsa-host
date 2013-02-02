@@ -1,5 +1,5 @@
-#ifndef VAHLISTENER_HPP
-#define VAHLISTENER_HPP
+#ifndef TCPLISTENER_HPP
+#define TCPLISTENER_HPP
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -9,7 +9,7 @@
 
 /* a class for listening on a port for connections */
 
-class VAHListener : public Pollable {
+class TCPListener : public Pollable {
 
  protected:
   struct pollfd pollfd;
@@ -25,7 +25,7 @@ class VAHListener : public Pollable {
 
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
-  VAHListener(int server_port_num, PollableMinder * minder);
+  TCPListener(int server_port_num, PollableMinder * minder);
 };
 
-#endif // VAHLISTENER_HPP
+#endif // TCPLISTENER_HPP

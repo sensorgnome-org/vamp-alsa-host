@@ -229,8 +229,8 @@ now(bool is_monotonic = true) {
 
 #include "Pollable.hpp"
 #include "PollableMinder.hpp"
-#include "VAHListener.hpp"
-#include "VAHConnection.hpp"
+#include "TCPListener.hpp"
+#include "TCPConnection.hpp"
 
 static PluginLoader *pluginLoader = 0;
 
@@ -239,12 +239,12 @@ class AlsaMinder;
 
 typedef std::map < string, AlsaMinder *> AlsaMinderNamedSet;
 typedef std::map < string, PluginRunner *> PluginRunnerNamedSet;
-typedef std::set < VAHConnection *> VAHConnectionSet;
+typedef std::set < TCPConnection *> TCPConnectionSet;
 
 #include "PluginRunner.hpp"
 #include "AlsaMinder.hpp"
 
-// this is the owner of all pollabel objects:  AlsaMinders, VAHConnections, and VAHListeners
+// this is the owner of all pollabel objects:  AlsaMinders, TCPConnections, and TCPListener
 static PollableMinder minder;
 
 static AlsaMinderNamedSet alsas;         // does not own objects pointed to by members
@@ -317,7 +317,7 @@ void run(PollableMinder & minder)
 }
 
 
-string runCommand(string cmdString, VAHConnection *conn) {
+string runCommand(string cmdString, TCPConnection *conn) {
     ostringstream reply;
     string word;
     istringstream cmd(cmdString);
@@ -498,9 +498,9 @@ main(int argc, char **argv)
     signal(SIGFPE, terminate);
     signal(SIGABRT, terminate);
 
-    VAHConnection::setCommandHandler(& runCommand);
+    TCPConnection::setCommandHandler(& runCommand);
 
-    minder.add (new VAHListener(serverPortNum, &minder));
+    minder.add (new TCPListener(serverPortNum, &minder));
     run(minder);
 }
 

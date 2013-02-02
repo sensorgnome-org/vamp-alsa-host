@@ -14,7 +14,7 @@ using namespace Vamp;
 using namespace Vamp::HostExt;
 
 #include "ParamSet.hpp"
-#include "VAHConnection.hpp"
+#include "TCPConnection.hpp"
 
 class AlsaMinder;
 
@@ -45,10 +45,10 @@ protected:
   // is either completely written or not written at all.  For binary output,
   // we just discard at arbitrary boundaries.
 
-  VAHConnection *    outputConnection; // connection to which output is written
+  TCPConnection *    outputConnection; // connection to which output is written
 
 public:
-  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, AlsaMinder *inputSource, VAHConnection *outputConnection);
+  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, AlsaMinder *inputSource, TCPConnection *outputConnection);
   ~PluginRunner();
   int loadPlugin(ParamSet &ps);
   void setInputSource(AlsaMinder *am);

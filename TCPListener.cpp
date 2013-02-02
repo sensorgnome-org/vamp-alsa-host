@@ -1,12 +1,12 @@
-#include "VAHListener.hpp"
-#include "VAHConnection.hpp"
+#include "TCPListener.hpp"
+#include "TCPConnection.hpp"
 #include <stdexcept>
 
-int VAHListener::getPollFDs (struct pollfd * pollfds) {
+int TCPListener::getPollFDs (struct pollfd * pollfds) {
   * pollfds = pollfd;
 };
 
-void VAHListener::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
+void TCPListener::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
   // accept a connection
   if (pollfds->revents & (POLLIN | POLLPRI)) {
     struct sockaddr_in cli_addr;
@@ -14,12 +14,12 @@ void VAHListener::handleEvents (struct pollfd *pollfds, bool timedOut, double ti
     socklen_t clilen = sizeof(cli_addr);
     int conn_fd = accept4(pollfd.fd, (struct sockaddr *) &cli_addr, &clilen, SOCK_NONBLOCK);
     if (conn_fd >= 0) {
-      minder->add(new VAHConnection(conn_fd, minder));
+      minder->add(new TCPConnection(conn_fd, minder));
     }
   }
 };
 
-VAHListener::VAHListener(int server_port_num, PollableMinder *minder) : 
+TCPListener::TCPListener(int server_port_num, PollableMinder *minder) : 
   Pollable(minder),
   server_port_num(server_port_num),
   SO_REUSEADDR_ON(1) 
@@ -27,7 +27,7 @@ VAHListener::VAHListener(int server_port_num, PollableMinder *minder) :
     
   pollfd.fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
   if (pollfd.fd < 0)
-    throw std::runtime_error("Error opening socket for VAHListener");
+    throw std::runtime_error("Error opening socket for TCPListener");
 
   setsockopt(pollfd.fd, SOL_SOCKET, SO_REUSEADDR, &SO_REUSEADDR_ON, sizeof(SO_REUSEADDR_ON));
   pollfd.events = POLLIN | POLLPRI;

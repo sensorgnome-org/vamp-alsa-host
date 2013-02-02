@@ -1,5 +1,5 @@
-#ifndef VAHCONNECTION_HPP
-#define VAHCONNECTION_HPP
+#ifndef TCPCONNECTION_HPP
+#define TCPCONNECTION_HPP
 
 #include <string>
 #include <sstream>
@@ -10,12 +10,12 @@ using std::istringstream;
 
 #include "Pollable.hpp"
 
-class VAHConnection;
+class TCPConnection;
 
 // type that handles commands
-typedef string (*CommandHandler) (string, VAHConnection *);
+typedef string (*CommandHandler) (string, TCPConnection *);
 
-class VAHConnection : public Pollable {
+class TCPConnection : public Pollable {
 
 protected: 
   struct pollfd pollfd;
@@ -36,7 +36,7 @@ protected:
 
 public:
 
-  VAHConnection (int fd, PollableMinder *minder);
+  TCPConnection (int fd, PollableMinder *minder);
   
   int getNumPollFDs() { return 1;};
 
@@ -53,4 +53,4 @@ public:
   static void setCommandHandler (CommandHandler commandHandler);
 };
 
-#endif // VAHCONNECTION_HPP
+#endif // TCPCONNECTION_HPP

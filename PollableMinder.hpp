@@ -13,20 +13,23 @@
 #include <errno.h>
 #include <string>
 #include <sstream>
+#include <memory>
 
 using std::string;
 using std::istringstream;
 using std::ostringstream;
+using std::unique_ptr;
 
 class Pollable;
 
-typedef std::set <Pollable *> PollableSet;
+typedef std::set < unique_ptr <Pollable> > PollableOwnerSet;
+typedef std::set < Pollable * > PollableSet;
 typedef std::map <Pollable *, int > PollableIndex;
 
 class PollableMinder {
 
 protected:
-  PollableSet pollables; // maintained in same order as pollfds, but might not be of same length if some objects have more than one FD
+  PollableOwnerSet pollables; // maintained in same order as pollfds, but might not be of same length if some objects have more than one FD
   // this object owns the objects pointed to
   std::vector <struct pollfd> pollfds;
   PollableIndex first_pollfd; // map of Pollable * to index of first corresponding struct pollfd in pollfds

@@ -11,9 +11,9 @@ using namespace std;
 
 #include "Pollable.hpp"
 #include "PluginRunner.hpp"
-#include "VAHConnection.hpp"
+#include "TCPConnection.hpp"
 
-typedef std::set < VAHConnection * > RawListenerSet;
+typedef std::set < TCPConnection * > RawListenerSet;
 
 class AlsaMinder : public Pollable {
 public:
@@ -55,8 +55,8 @@ public:
   int requestStart(double timeNow);
   void addPluginRunner(PluginRunner *pr);
   void removePluginRunner(PluginRunner *pr);
-  void addRawListener(VAHConnection *conn);
-  void removeRawListener(VAHConnection *conn);
+  void addRawListener(TCPConnection *conn);
+  void removeRawListener(TCPConnection *conn);
   void removeAllRawListeners();
 
   AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, PollableMinder * minder);
