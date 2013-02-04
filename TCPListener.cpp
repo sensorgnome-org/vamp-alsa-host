@@ -4,6 +4,7 @@
 
 int TCPListener::getPollFDs (struct pollfd * pollfds) {
   * pollfds = pollfd;
+  return 0;
 };
 
 void TCPListener::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
@@ -21,9 +22,9 @@ void TCPListener::handleEvents (struct pollfd *pollfds, bool timedOut, double ti
 
 TCPListener::TCPListener(int server_port_num, NewConnectionHandler newConnectionHandler) : 
   Pollable(0),
+  SO_REUSEADDR_ON(1),
   server_port_num(server_port_num),
-  newConnectionHandler(newConnectionHandler),
-  SO_REUSEADDR_ON(1) 
+  newConnectionHandler(newConnectionHandler)
 {
     
   pollfd.fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);

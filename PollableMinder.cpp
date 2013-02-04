@@ -65,7 +65,6 @@ int PollableMinder::poll(int timeout, double (*now)(bool isRealtime)) {
   bool timedOut = rv == 0;
   // handle events for each pollable.  We give each pollable the chance 
   // to deal with timeouts, by passing that along.
-  int i = 0;
   PollableSet to_delete;
   for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
     auto ptr = is->second.lock();
@@ -109,6 +108,9 @@ void PollableMinder::regenFDs() {
           first_pollfd[is->first] = where;
           pollfds.resize(where + numFDs);
           ptr->getPollFDs(& pollfds[where]);
+          ptr->inPollFD = true;
+        } else {
+          ptr->inPollFD = false;
         }
         ++is;
       } else {

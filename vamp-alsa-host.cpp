@@ -243,8 +243,6 @@ now(bool is_monotonic = true) {
 #include "TCPListener.hpp"
 #include "TCPConnection.hpp"
 
-static PluginLoader *pluginLoader = 0;
-
 class PluginRunner;
 class AlsaMinder;
 
@@ -256,7 +254,6 @@ typedef std::map < TCPConnection *, std::shared_ptr < TCPConnection > > TCPConne
 #include "AlsaMinder.hpp"
 
 static PollableMinder minder;
-static TCPListener *vahListener;
 static AlsaMinderNamedSet alsas;
 static PluginRunnerNamedSet plugins;
 static TCPConnectionSet connections;
@@ -486,8 +483,9 @@ string runCommand(string cmdString, TCPConnection *conn) {
 
 void
 newConnectionHandler(int fd) {
-    std::shared_ptr < TCPConnection > conn = std::make_shared < TCPConnection > (fd, & minder);
+    auto conn = std::make_shared < TCPConnection > (fd, & minder);
     connections[conn.get()] = conn;
+    minder.add(conn);
 };
 
 int 
@@ -533,8 +531,8 @@ main(int argc, char **argv)
 
     TCPConnection::setCommandHandler(& runCommand);
     
-    vahListener = new TCPListener(serverPortNum, &newConnectionHandler);
-    minder.add (std::shared_ptr < TCPListener > (vahListener) );
+    auto tcpListener = std::make_shared < TCPListener > (serverPortNum, &newConnectionHandler);
+    minder.add (std::shared_ptr < TCPListener > (tcpListener) );
     run(minder);
 }
 

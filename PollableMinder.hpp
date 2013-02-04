@@ -22,7 +22,7 @@ using std::ostringstream;
 class Pollable;
 
 typedef std::map < Pollable *, std::weak_ptr < Pollable > > PollableSet;
-typedef std::map <Pollable *, int > PollableIndex;
+typedef std::map < Pollable *, int > PollableIndex;
 
 class PollableMinder {
 
@@ -42,6 +42,7 @@ public:
   void add(std::shared_ptr < Pollable > p);
   void remove(std::shared_ptr < Pollable > p);
   void remove(std::weak_ptr < Pollable > p);
+  void remove(Pollable * p);
   short & eventsOf(Pollable *p, int offset = 0); // reference to the events field for a pollfd
   void requestPollFDRegen();
   int poll(int timeout, double (*now)(bool isRealtime));

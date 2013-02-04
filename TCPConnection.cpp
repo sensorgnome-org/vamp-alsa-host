@@ -8,7 +8,13 @@ TCPConnection::TCPConnection (int fd, PollableMinder * minder) :
 {
   pollfd.fd = fd;
   pollfd.events = POLLIN | POLLRDHUP;
-  
+  queueTextOutput("{"
+                  "\"message\":\"Welcome to vamp_alsa_host.  Type 'help' for help.\","
+                  "\"version\":\"1.0.0\","
+                  "\"author\":\"Copyright (C) 2012-2013 John Brzustowski\","
+                  "\"maintainer\":\"jbrzusto@fastmail.fm\","
+                  "\"licence\":\"GNU GPL version 2.0 or later\""
+                  "}\n");
 };
   
 int TCPConnection::getPollFDs (struct pollfd * pollfds) {
@@ -18,20 +24,26 @@ int TCPConnection::getPollFDs (struct pollfd * pollfds) {
 
 void TCPConnection::queueFloatOutput(std::vector < float > & f) {
   outputFloatBuffer.insert(outputFloatBuffer.end(), f.begin(), f.end());
-  pollfd.events = minder->eventsOf(this) |= POLLOUT;
+  pollfd.events |= POLLOUT;
+  if (inPollFD)
+    minder->eventsOf(this) = pollfd.events;
 };
 
 void TCPConnection::queueTextOutput(string s) {
   if (s.length() == 0)
     return;
   outputLineBuffer.push_back(s);
-  pollfd.events = minder->eventsOf(this) |= POLLOUT;
+  pollfd.events |= POLLOUT;
+  if (inPollFD)
+    minder->eventsOf(this) = pollfd.events;
 };
 
 void TCPConnection::queueRawOutput(const char *p, int len, int granularity) {
   outputRawBuffer.insert(outputRawBuffer.end(), p, p+len);
   outputRawBufferGranularity = granularity;
-  pollfd.events = minder->eventsOf(this) |= POLLOUT;
+  pollfd.events |= POLLOUT;
+  if (inPollFD)
+    minder->eventsOf(this) = pollfd.events;
 };
     
 void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {

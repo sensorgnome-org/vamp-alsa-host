@@ -30,8 +30,8 @@ public:
 
 protected:
   static PluginLoader *pluginLoader;   // plugin loader (singleton)
-  int                numChan;          // number of channels plugin uses
   int                rate;             // sampling rate; frames per second
+  unsigned int       numChan;          // number of channels plugin uses
   long long          totalFeatures;    // total number of "features" (e.g. lotek pulses) seen on this FCD
   Plugin *           plugin;           // VAMP plugin we'll be running on this fcd
   float **           plugbuf;          // pointer to one buffer for each channel (left, right) of float data for plugin

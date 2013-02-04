@@ -99,6 +99,7 @@ void AlsaMinder::removeAllRawListeners() {
 };
 
 AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, PollableMinder *minder):
+  Pollable(minder),
   alsaDev(alsaDev),
   rate(rate),
   numChan(numChan),
@@ -113,8 +114,7 @@ AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &
   shouldBeRunning(false),
   stopped(true),
   hasError(0),
-  numFD(0),
-  Pollable(minder)
+  numFD(0)
 {
   if (open()) {
     // there was an error, so throw an exception

@@ -5,7 +5,7 @@ void PluginRunner::delete_privates() {
     delete plugin;
   }
   if (plugbuf) {
-    for (unsigned i=0; i < numChan; ++i) {
+    for (unsigned int i=0; i < numChan; ++i) {
       if (plugbuf[i])
         delete [] plugbuf[i];
     }
@@ -116,21 +116,21 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
 PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, std::shared_ptr < TCPConnection > outputConnection):
   label(label),
   devLabel(devLabel),
-  rate(rate),
-  numChan(numChan),
   pluginSOName(pluginSOName),
   pluginID(pluginID),
   pluginOutput(pluginOutput),
   pluginParams(ps),
-  outputConnection(outputConnection),
+  rate(rate),
+  numChan(numChan),
   totalFeatures(0),
   plugin(0),
   plugbuf(0),
-  framesInPlugBuf(0),
   outputNo(-1),
   blockSize(0),
   stepSize(0),
-  isOutputBinary(false)
+  framesInPlugBuf(0),
+  isOutputBinary(false),
+  outputConnection(outputConnection)
 {
 
   // try load the plugin and throw if we fail
