@@ -1,8 +1,6 @@
 #include "AlsaMinder.hpp"
 
 void AlsaMinder::delete_privates() {
-  // delete any plugins working with this data
-  plugins.clear();
   if (pcm) {
     snd_pcm_drop(pcm);
     snd_pcm_close(pcm);
@@ -80,19 +78,20 @@ int AlsaMinder::requestStart(double timeNow) {
 };
 
 void AlsaMinder::addPluginRunner(std::shared_ptr < PluginRunner > pr) {
-  plugins.insert(pr);
+  plugins[pr.get()] = pr;
 };
 
 void AlsaMinder::removePluginRunner(std::shared_ptr < PluginRunner > pr) {
-  plugins.erase(pr);
+  // remove plugin runner 
+  plugins.erase(pr.get());
 };
 
-void AlsaMinder::addRawListener(TCPConnection *conn) {
-  rawListeners.insert(conn);
+void AlsaMinder::addRawListener(std::shared_ptr < TCPConnection > conn) {
+  rawListeners[conn.get()] = conn;
 };
 
-void AlsaMinder::removeRawListener(TCPConnection *conn) {
-  rawListeners.erase(conn);
+void AlsaMinder::removeRawListener(std::shared_ptr < TCPConnection > conn) {
+  rawListeners.erase(conn.get());
 };
 
 void AlsaMinder::removeAllRawListeners() {
@@ -236,13 +235,19 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
       src0 += step * offset;
 
-      for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); ++ir) {
+      for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
         // FIXME: big assumptions here:
         // - S16_LE sample format
         // - samples occupy a contiguous area of memory, starting at the first byte
         //   of the first sample on channel 0
 
-        (*ir)->queueRawOutput((char *) src0, avail * numChan * 2, numChan * 2);
+        if (auto ptr = (ir->second).lock()) {
+          ptr->queueRawOutput((char *) src0, avail * numChan * 2, numChan * 2);
+          ++ir;
+        } else {
+          RawListenerSet::iterator to_delete = ir++;
+          rawListeners.erase(to_delete);
+        }
       }
 
       /*
@@ -262,7 +267,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
           src1 = (int16_t *) (((unsigned char *) areas[1].addr) + areas[1].first / 8);
           src1 += step * offset;
         }
-        if (auto ptr = (*ip).lock()) {
+        if (auto ptr = (ip->second).lock()) {
           ptr->handleData(avail, src0, src1, step, totalFrames, frameTimestamp, frameOfTimestamp);
           ++ip;
         } else {

@@ -11,11 +11,14 @@
 
 class TCPListener : public Pollable {
 
+  typedef  void (*NewConnectionHandler) (int fd);
+
  protected:
   struct pollfd pollfd;
   struct sockaddr_in serv_addr;
   int SO_REUSEADDR_ON;
   int server_port_num;
+  NewConnectionHandler newConnectionHandler;
 
  public:
 
@@ -25,7 +28,7 @@ class TCPListener : public Pollable {
 
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
-  TCPListener(int server_port_num, PollableMinder * minder);
+  TCPListener(int server_port_num, NewConnectionHandler newConnectionHandler);
 };
 
 #endif // TCPLISTENER_HPP

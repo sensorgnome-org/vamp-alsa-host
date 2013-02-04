@@ -14,7 +14,8 @@ using namespace std;
 #include "PluginRunner.hpp"
 #include "TCPConnection.hpp"
 
-typedef std::set < TCPConnection * > RawListenerSet;
+typedef std::map < TCPConnection *, std::weak_ptr < TCPConnection > > RawListenerSet;
+typedef std::map < PluginRunner *, std::weak_ptr < PluginRunner > > PluginRunnerSet;
 
 class AlsaMinder : public Pollable {
 public:
@@ -56,8 +57,8 @@ public:
   int requestStart(double timeNow);
   void addPluginRunner(std::shared_ptr < PluginRunner > pr);
   void removePluginRunner(std::shared_ptr < PluginRunner > pr);
-  void addRawListener(TCPConnection *conn);
-  void removeRawListener(TCPConnection *conn);
+  void addRawListener(std::shared_ptr < TCPConnection > conn);
+  void removeRawListener(std::shared_ptr < TCPConnection > conn);
   void removeAllRawListeners();
 
   AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, PollableMinder * minder);

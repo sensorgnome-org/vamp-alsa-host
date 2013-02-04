@@ -113,7 +113,7 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
   return 0;
 };
 
-PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, TCPConnection *outputConnection):
+PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, std::shared_ptr < TCPConnection > outputConnection):
   label(label),
   devLabel(devLabel),
   rate(rate),
@@ -208,14 +208,17 @@ void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *s
 void
 PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
 {
-  if (! outputConnection)
+  auto ptr = outputConnection.lock();
+  if (! ptr) {
+    // FIXME: my output connection has died; I should die too
     return;
-
+  }
+  
   totalFeatures += features[outputNo].size();
   for (Plugin::FeatureList::iterator f = features[outputNo].begin(), g = features[outputNo].end(); f != g; ++f ) {
     if (isOutputBinary) {
       // copy values as raw bytes
-      outputConnection->queueFloatOutput(f->values);
+      ptr->queueFloatOutput(f->values);
     } else {
       ostringstream txt;
       txt.setf(ios::fixed,ios::floatfield);
@@ -242,7 +245,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
       }
 
       txt << endl;
-      outputConnection->queueTextOutput(txt.str());
+      ptr->queueTextOutput(txt.str());
     }
   }
 };

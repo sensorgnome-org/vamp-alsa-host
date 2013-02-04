@@ -45,7 +45,7 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
     int len = read(pollfd.fd, cmdString, MAX_CMD_STRING_LENGTH);
     if (len <= 0) {
       // socket has been closed, apparently
-      minder->remove(this);
+      // FIXME: delete this connection via shared_ptr in connections
       return;
     }
     cmdString[len] = '\0';
@@ -87,7 +87,7 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
         int num_bytes = write(pollfd.fd, outputPartialLine.c_str(), len);
         if (num_bytes < 0 ) {
           if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            minder->remove(this);
+      // FIXME: delete this connection via shared_ptr in connections
           }
         } else {
           outputPartialLine.erase(0, num_bytes);

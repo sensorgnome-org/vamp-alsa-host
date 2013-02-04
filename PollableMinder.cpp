@@ -13,26 +13,30 @@ PollableMinder::PollableMinder():
 {
 };
   
-void PollableMinder::add(Pollable *p) {
+void PollableMinder::add(std::shared_ptr < Pollable > p) {
   if (! doing_poll) {
-    pollables.insert(p);
+    pollables[p.get()] = p;
     regen_pollfds = true;
   } else {
-    deferred_adds.insert(p);
+    deferred_adds[p.get()] = p;
     have_deferrals = true;
   }
 }
   
-void PollableMinder::remove(Pollable *p) {
+void PollableMinder::remove(std::shared_ptr < Pollable > p) {
   if (! doing_poll) {
-    pollables.erase(p);
-    delete p;
+    pollables.erase(p.get());
+    delete p.get();
     regen_pollfds = true;
   } else {
-    deferred_removes.insert(p);
+    deferred_removes[p.get()] = p;
     have_deferrals = true;
   }
 }
+
+void PollableMinder::remove(std::weak_ptr < Pollable > p) {
+  remove(p.lock());
+};
 
 short& PollableMinder::eventsOf(Pollable *p, int offset) {
 
@@ -64,15 +68,20 @@ int PollableMinder::poll(int timeout, double (*now)(bool isRealtime)) {
   int i = 0;
   PollableSet to_delete;
   for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
-    PollableIndex::iterator ip = first_pollfd.find(*is);
-    if (ip == first_pollfd.end())
-      continue;
-    (*is)->handleEvents(&pollfds[ip->second], timedOut, (*now)(false));
+    auto ptr = is->second.lock();
+    if (!ptr) {
+      remove(is->second); // will be deferred
+    } else {
+      PollableIndex::iterator ip = first_pollfd.find(is->first);
+      if (ip == first_pollfd.end())
+        continue;
+      ptr->handleEvents(&pollfds[ip->second], timedOut, (*now)(false));
+    }
   }
   doing_poll = false;
   doDeferrals();
   return 0;
-}
+};
 
 void PollableMinder::doDeferrals() {
   if (! have_deferrals)
@@ -80,7 +89,7 @@ void PollableMinder::doDeferrals() {
   have_deferrals = false;
   regen_pollfds = true;
   for (PollableSet::iterator is = deferred_removes.begin(); is != deferred_removes.end(); ++is) 
-    pollables.erase(*is);
+    pollables.erase(is->first);
   deferred_removes.clear();
   for (PollableSet::iterator is = deferred_adds.begin(); is != deferred_adds.end(); ++is) 
     pollables.insert(*is);
@@ -92,13 +101,20 @@ void PollableMinder::regenFDs() {
     regen_pollfds = false;
     pollfds.clear();
     first_pollfd.clear();
-    for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
-      int where = pollfds.size();
-      int numFDs = (*is)->getNumPollFDs();
-      if (numFDs > 0) {
-        first_pollfd[*is] = where;
-        pollfds.resize(where + numFDs);
-        (*is)->getPollFDs(& pollfds[where]);
+    for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); /**/) {
+      if (auto ptr = is->second.lock()) {
+        int where = pollfds.size();
+        int numFDs = ptr->getNumPollFDs();
+        if (numFDs > 0) {
+          first_pollfd[is->first] = where;
+          pollfds.resize(where + numFDs);
+          ptr->getPollFDs(& pollfds[where]);
+        }
+        ++is;
+      } else {
+        auto to_delete = is;
+        ++is;
+        pollables.erase(to_delete->first);
       }
     }
   }

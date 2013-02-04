@@ -9,6 +9,7 @@
 #include <vamp-sdk/PluginBase.h>
 #include <stdint.h>
 #include <set>
+#include <memory>
 
 using namespace Vamp;
 using namespace Vamp::HostExt;
@@ -44,10 +45,10 @@ protected:
   // is either completely written or not written at all.  For binary output,
   // we just discard at arbitrary boundaries.
 
-  TCPConnection *    outputConnection; // connection to which output is written
+  std::weak_ptr < TCPConnection >    outputConnection; // connection to which output is written
 
 public:
-  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, TCPConnection *outputConnection);
+  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, std::shared_ptr < TCPConnection > outputConnection);
   ~PluginRunner();
   int loadPlugin(ParamSet &ps);
   void handleData(long avail, int16_t *src0, int16_t *src1, int step, long long totalFrames, long long frameOfTimestamp, double frameTimestamp);
@@ -58,7 +59,6 @@ private:
   void delete_privates();
 };
 
-typedef std::set < std::weak_ptr < PluginRunner >, std::owner_less<std::weak_ptr< PluginRunner > > > PluginRunnerSet;
 
 #include "AlsaMinder.hpp"
 

@@ -248,19 +248,18 @@ static PluginLoader *pluginLoader = 0;
 class PluginRunner;
 class AlsaMinder;
 
-typedef std::map < string, AlsaMinder *> AlsaMinderNamedSet;
+typedef std::map < string, std::shared_ptr < AlsaMinder > > AlsaMinderNamedSet;
 typedef std::map < string, std::shared_ptr < PluginRunner > > PluginRunnerNamedSet;
-typedef std::set < TCPConnection *> TCPConnectionSet;
+typedef std::map < TCPConnection *, std::shared_ptr < TCPConnection > > TCPConnectionSet;
 
 #include "PluginRunner.hpp"
 #include "AlsaMinder.hpp"
 
-// this is the owner of all pollabel objects:  AlsaMinders, TCPConnections, and TCPListener
 static PollableMinder minder;
-
-static AlsaMinderNamedSet alsas;         // does not own objects pointed to by members
+static TCPListener *vahListener;
+static AlsaMinderNamedSet alsas;
 static PluginRunnerNamedSet plugins;
-
+static TCPConnectionSet connections;
 
 #define HOST_VERSION "1.4"
 
@@ -302,7 +301,7 @@ terminate (int p)
     terminating = true;
 
     for (AlsaMinderNamedSet::iterator fcdi = alsas.begin(); fcdi != alsas.end(); ++fcdi) {
-        AlsaMinder *fcd = fcdi->second;
+        AlsaMinder *fcd = fcdi->second.get();
         delete fcd;
         fcdi->second = 0;
     }
@@ -364,7 +363,7 @@ string runCommand(string cmdString, TCPConnection *conn) {
         cmd >> label;
         AlsaMinderNamedSet::iterator fcdi = alsas.find(label);
         if (fcdi != alsas.end()) {
-            AlsaMinder *fcd = fcdi->second;
+            AlsaMinder *fcd = fcdi->second.get();
             reply << fcd->toJSON();
         } else {
             reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
@@ -387,7 +386,7 @@ string runCommand(string cmdString, TCPConnection *conn) {
         bool doStop = word == "stop";
         AlsaMinderNamedSet::iterator fcdi = alsas.find(label);
         if (fcdi != alsas.end()) {
-            AlsaMinder *fcd = fcdi->second;
+            AlsaMinder *fcd = fcdi->second.get();
             if (doStop)
                 fcd->requestStop(timeNow);
             else
@@ -402,11 +401,11 @@ string runCommand(string cmdString, TCPConnection *conn) {
         cmd >> label;
         AlsaMinderNamedSet::iterator fcdi = alsas.find(label);
         if (fcdi != alsas.end()) {
-            AlsaMinder *fcd = fcdi->second;
+            AlsaMinder *fcd = fcdi->second.get();
             if (word == "rawOn") {
-                fcd->addRawListener(conn);
+                fcd->addRawListener(connections[conn]);
             } else if (word == "rawOff") {
-                fcd->removeRawListener(conn);
+                fcd->removeRawListener(connections[conn]);
             } else {
                 fcd->removeAllRawListeners();
             }
@@ -418,7 +417,8 @@ string runCommand(string cmdString, TCPConnection *conn) {
         int rate, numChan;
         cmd >> label >> alsaDev >> rate >> numChan;
         try {
-            minder.add(alsas[label] = new AlsaMinder(alsaDev, rate, numChan, label, timeNow, & minder));
+            alsas[label] = std::make_shared < AlsaMinder > (alsaDev, rate, numChan, label, timeNow, & minder);
+            minder.add(alsas[label]);
             minder.requestPollFDRegen();
             reply << alsas[label]->toJSON();
         } catch (std::runtime_error e) {
@@ -429,7 +429,7 @@ string runCommand(string cmdString, TCPConnection *conn) {
         cmd >> label;
         AlsaMinderNamedSet::iterator fcdi = alsas.find(label);
         if (fcdi != alsas.end()) {
-            AlsaMinder *fcd = fcdi->second;
+            AlsaMinder *fcd = fcdi->second.get();
             fcd->requestStop(timeNow);
             reply << fcd->toJSON();
             delete fcd;
@@ -453,7 +453,7 @@ string runCommand(string cmdString, TCPConnection *conn) {
             AlsaMinderNamedSet::iterator fcdi = alsas.find(devLabel);
             if (fcdi == alsas.end())
                 throw std::runtime_error(string("There is no device with label '") + devLabel + "'");
-            std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, fcdi->second->rate, fcdi->second->numChan, pluginLib, pluginName, outputName, ps, conn);
+            std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, fcdi->second->rate, fcdi->second->numChan, pluginLib, pluginName, outputName, ps, connections[conn]);
             plugins[pluginLabel] = plugin;
             fcdi->second->addPluginRunner(plugin);
             reply << plugin->toJSON();
@@ -482,6 +482,12 @@ string runCommand(string cmdString, TCPConnection *conn) {
     }
     reply << endl;
     return reply.str();
+};
+
+void
+newConnectionHandler(int fd) {
+    std::shared_ptr < TCPConnection > conn = std::make_shared < TCPConnection > (fd, & minder);
+    connections[conn.get()] = conn;
 };
 
 int 
@@ -526,8 +532,9 @@ main(int argc, char **argv)
     signal(SIGABRT, terminate);
 
     TCPConnection::setCommandHandler(& runCommand);
-
-    minder.add (new TCPListener(serverPortNum, &minder));
+    
+    vahListener = new TCPListener(serverPortNum, &newConnectionHandler);
+    minder.add (std::shared_ptr < TCPListener > (vahListener) );
     run(minder);
 }
 

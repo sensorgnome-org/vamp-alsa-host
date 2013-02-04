@@ -21,14 +21,13 @@ using std::ostringstream;
 
 class Pollable;
 
-typedef std::set < Pollable * > PollableOwnerSet;
-typedef std::set < Pollable * > PollableSet;
+typedef std::map < Pollable *, std::weak_ptr < Pollable > > PollableSet;
 typedef std::map <Pollable *, int > PollableIndex;
 
 class PollableMinder {
 
 protected:
-  PollableOwnerSet pollables; // maintained in same order as pollfds, but might not be of same length if some objects have more than one FD
+  PollableSet pollables; // maintained in same order as pollfds, but might not be of same length if some objects have more than one FD
   // this object owns the objects pointed to
   std::vector <struct pollfd> pollfds;
   PollableIndex first_pollfd; // map of Pollable * to index of first corresponding struct pollfd in pollfds
@@ -40,8 +39,9 @@ protected:
 public:
   
   PollableMinder();
-  void add(Pollable *p);
-  void remove(Pollable *p);
+  void add(std::shared_ptr < Pollable > p);
+  void remove(std::shared_ptr < Pollable > p);
+  void remove(std::weak_ptr < Pollable > p);
   short & eventsOf(Pollable *p, int offset = 0); // reference to the events field for a pollfd
   void requestPollFDRegen();
   int poll(int timeout, double (*now)(bool isRealtime));

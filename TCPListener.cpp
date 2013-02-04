@@ -14,14 +14,15 @@ void TCPListener::handleEvents (struct pollfd *pollfds, bool timedOut, double ti
     socklen_t clilen = sizeof(cli_addr);
     int conn_fd = accept4(pollfd.fd, (struct sockaddr *) &cli_addr, &clilen, SOCK_NONBLOCK);
     if (conn_fd >= 0) {
-      minder->add(new TCPConnection(conn_fd, minder));
+      newConnectionHandler(conn_fd);
     }
   }
 };
 
-TCPListener::TCPListener(int server_port_num, PollableMinder *minder) : 
-  Pollable(minder),
+TCPListener::TCPListener(int server_port_num, NewConnectionHandler newConnectionHandler) : 
+  Pollable(0),
   server_port_num(server_port_num),
+  newConnectionHandler(newConnectionHandler),
   SO_REUSEADDR_ON(1) 
 {
     
