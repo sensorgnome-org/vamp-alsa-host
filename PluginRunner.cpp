@@ -1,8 +1,6 @@
 #include "PluginRunner.hpp"
 
 void PluginRunner::delete_privates() {
-  if (inputSource)
-    inputSource->removePluginRunner(this);
   if (plugin) {
     delete plugin;
   }
@@ -115,7 +113,7 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
   return 0;
 };
 
-PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, AlsaMinder *inputSource, TCPConnection *outputConnection):
+PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, TCPConnection *outputConnection):
   label(label),
   devLabel(devLabel),
   rate(rate),
@@ -124,7 +122,6 @@ PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numCha
   pluginID(pluginID),
   pluginOutput(pluginOutput),
   pluginParams(ps),
-  inputSource(inputSource),
   outputConnection(outputConnection),
   totalFeatures(0),
   plugin(0),
@@ -146,11 +143,6 @@ PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numCha
 
 PluginRunner::~PluginRunner() {
   delete_privates();
-};
-
-void PluginRunner::setInputSource(AlsaMinder *am) {
-  inputSource = am;
-  am->addPluginRunner(this);
 };
 
 void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *src1, int step, long long totalFrames, long long frameOfTimestamp, double frameTimestamp) {

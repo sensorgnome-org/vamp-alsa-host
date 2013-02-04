@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <iomanip>
+#include <memory>
 
 using namespace std;
 #include <alsa/asoundlib.h>
@@ -53,8 +54,8 @@ public:
   void requestStop(double timeNow);
   int start(double timeNow);
   int requestStart(double timeNow);
-  void addPluginRunner(PluginRunner *pr);
-  void removePluginRunner(PluginRunner *pr);
+  void addPluginRunner(std::shared_ptr < PluginRunner > pr);
+  void removePluginRunner(std::shared_ptr < PluginRunner > pr);
   void addRawListener(TCPConnection *conn);
   void removeRawListener(TCPConnection *conn);
   void removeAllRawListeners();

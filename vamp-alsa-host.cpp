@@ -100,6 +100,7 @@
 #include <iomanip>
 #include <fstream>
 #include <sstream>
+#include <memory>
 #include <set>
 #include <time.h>
 
@@ -145,15 +146,19 @@ static const string commandHelp =
     "          using the 'start DEV_LABEL' command - see below\n\n"
     "          Arguments:\n"
     "          DEV_LABEL: a label which will identify this audio device in subsequent commands\n"
-    "             and in output lines\n"
+    "             and in output lines.  This must be unique among devices.\n"
     "          AUDIO_DEV: the ALSA name of the audio device (e.g. 'default:CARD=V10')\n"
     "          RATE: the sampling rate to use for the device (e.g. 48000)\n"
     "          NUM_CHANNELS: the number of channels to read from the device (usually 1 or 2)\n\n"
     "          e.g. open 3 default:CARD=V10_2 48000 2\n\n"
 
     "       attach DEV_LABEL PLUGIN_LABEL PLUGIN_SONAME PLUGIN_ID PLUGIN_OUTPUT [PAR VALUE]*\n"
+    "          Load the specified plugin and attach it to the specified audio device.  Multiple plugins\n"
+    "          can be attached to the same device.  All incoming data is sent to all attached\n"
+    "          plugins, in the same order in which they were attached.\n"
     "          DEV_LABEL: the label for the input device, which must already have been opened with open\n"
-    "          PLUGIN_LABEL: the label for this plugin instance, for use in subsequent commands\n"
+    "          PLUGIN_LABEL: the label for this plugin instance, for use in subsequent commands.\n"
+    "          This label must be unique among all plugins attached to all devices.\n"
     "          PLUGIN_SONAME: the name (without path) of the library containing the plugin\n"
     "          PLUGIN_ID: the name of the plugin within the library\n"
     "          PLUGIN_OUTPUT: the name of the desired output from the plugin\n"
@@ -163,7 +168,13 @@ static const string commandHelp =
     "                       VALUE: is the value to be assiged to the parameter\n\n"
     "          e.g. attach 3 pulse3 lotek-plugins.so findpulsefdbatch pulses minsnr=6\n\n"
     "          Output from the plugin will be sent to the TCP connection which issued the 'attach' command\n\n"
-    
+
+    "       detach PLUGIN_LABEL\n"
+    "          Stop sending data to the specified plugin instance, and delete it.  Any other\n"
+    "          instances of the same plugin, and any other plugins attached to the same device\n"
+    "          are not affected.\n"
+    "          PLUGIN_LABEL: the label for an attached plugin instance.\n\n"
+
     "       rawOn DEV_LABEL\n"
     "          Raw data from the device DEV_LABEL will be sent to the issuing TCP connection\n"
     "          once the device is started, independently of any plugin processing.\n\n"
@@ -238,7 +249,7 @@ class PluginRunner;
 class AlsaMinder;
 
 typedef std::map < string, AlsaMinder *> AlsaMinderNamedSet;
-typedef std::map < string, PluginRunner *> PluginRunnerNamedSet;
+typedef std::map < string, std::shared_ptr < PluginRunner > > PluginRunnerNamedSet;
 typedef std::set < TCPConnection *> TCPConnectionSet;
 
 #include "PluginRunner.hpp"
@@ -359,11 +370,15 @@ string runCommand(string cmdString, TCPConnection *conn) {
             reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
         }
     } else if (word == "list") {
-        reply << "{";
+        reply << "{\"devices\":{";
         int i = alsas.size();
         for (AlsaMinderNamedSet::iterator fcdi = alsas.begin(); fcdi != alsas.end(); ++fcdi, --i) {
-            AlsaMinder *fcd = fcdi->second;
-            reply << "\"" << fcd->label << "\":" << fcd->toJSON() << (i > 1 ? "," : "");
+            reply << "\"" << fcdi->second->label << "\":" << fcdi->second->toJSON() << (i > 1 ? "," : "");
+        }
+        reply << "},\"plugins\":{";
+        i = plugins.size();
+        for (PluginRunnerNamedSet::iterator ip = plugins.begin(); ip != plugins.end(); ++ip, --i) {
+            reply << "\"" << ip->second->label << "\":" << ip->second->toJSON() << (i > 1 ? "," : "");
         }
         reply << "}";
     } else if (word == "start" || word == "stop") {
@@ -438,10 +453,22 @@ string runCommand(string cmdString, TCPConnection *conn) {
             AlsaMinderNamedSet::iterator fcdi = alsas.find(devLabel);
             if (fcdi == alsas.end())
                 throw std::runtime_error(string("There is no device with label '") + devLabel + "'");
-            PluginRunner *plugin = new PluginRunner(pluginLabel, devLabel, fcdi->second->rate, fcdi->second->numChan, pluginLib, pluginName, outputName, ps, fcdi->second, conn);
+            std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, fcdi->second->rate, fcdi->second->numChan, pluginLib, pluginName, outputName, ps, conn);
             plugins[pluginLabel] = plugin;
             fcdi->second->addPluginRunner(plugin);
             reply << plugin->toJSON();
+        } catch (std::runtime_error e) {
+            reply << "{\"error\": \"Error:" << e.what() << "\"}";
+        };
+    } else if (word == "detach") {
+        string pluginLabel;
+        cmd >> pluginLabel;
+        try {
+            PluginRunnerNamedSet::iterator ip = plugins.find(pluginLabel);
+            if (ip == plugins.end())
+                throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
+            plugins.erase(ip);
+            reply << "{\"message\": \"Plugin " << pluginLabel << " has been detached.\"}";
         } catch (std::runtime_error e) {
             reply << "{\"error\": \"Error:" << e.what() << "\"}";
         };

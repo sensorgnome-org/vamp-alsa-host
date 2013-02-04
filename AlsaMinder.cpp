@@ -2,8 +2,6 @@
 
 void AlsaMinder::delete_privates() {
   // delete any plugins working with this data
-  for (PluginRunnerSet::iterator it = plugins.begin(); it != plugins.end(); ++it)
-    delete (*it);
   plugins.clear();
   if (pcm) {
     snd_pcm_drop(pcm);
@@ -81,11 +79,11 @@ int AlsaMinder::requestStart(double timeNow) {
   return start(timeNow);
 };
 
-void AlsaMinder::addPluginRunner(PluginRunner *pr) {
+void AlsaMinder::addPluginRunner(std::shared_ptr < PluginRunner > pr) {
   plugins.insert(pr);
 };
 
-void AlsaMinder::removePluginRunner(PluginRunner *pr) {
+void AlsaMinder::removePluginRunner(std::shared_ptr < PluginRunner > pr) {
   plugins.erase(pr);
 };
 
@@ -253,7 +251,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       buffer has reached blocksize
       */
 
-      for (PluginRunnerSet::iterator ip = plugins.begin(); ip != plugins.end(); ++ip) {
+      for (PluginRunnerSet::iterator ip = plugins.begin(); ip != plugins.end(); /**/) {
         // we are going out on a limb and assuming the step is the same for both channels
 
         src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
@@ -264,7 +262,13 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
           src1 = (int16_t *) (((unsigned char *) areas[1].addr) + areas[1].first / 8);
           src1 += step * offset;
         }
-        (*ip)->handleData(avail, src0, src1, step, totalFrames, frameTimestamp, frameOfTimestamp);
+        if (auto ptr = (*ip).lock()) {
+          ptr->handleData(avail, src0, src1, step, totalFrames, frameTimestamp, frameOfTimestamp);
+          ++ip;
+        } else {
+          PluginRunnerSet::iterator to_delete = ip++;
+          plugins.erase(to_delete);
+        }
       }
       /*
       Tell ALSA we're finished using its internal mmap buffer.  We do

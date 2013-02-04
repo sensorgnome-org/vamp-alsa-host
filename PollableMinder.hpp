@@ -18,11 +18,10 @@
 using std::string;
 using std::istringstream;
 using std::ostringstream;
-using std::unique_ptr;
 
 class Pollable;
 
-typedef std::set < unique_ptr <Pollable> > PollableOwnerSet;
+typedef std::set < Pollable * > PollableOwnerSet;
 typedef std::set < Pollable * > PollableSet;
 typedef std::map <Pollable *, int > PollableIndex;
 

@@ -38,7 +38,6 @@ protected:
   int                blockSize;        // size (in frames) of blocks sent to plugin
   int                stepSize;         // amount (in frames) by which consecutive blocks differ
   int                framesInPlugBuf;  // number of frames in plugin buffers since last call to plugin->process()
-  AlsaMinder *       inputSource;      // which alsa device minder is producing input for this plugin?
   bool               isOutputBinary;   // if true, output from plugin is not text.  For text outputs, if
   // the output buffer gets filled before it can be written to a socket,
   // the oldest output is discarded line by line, so that any output line
@@ -48,10 +47,9 @@ protected:
   TCPConnection *    outputConnection; // connection to which output is written
 
 public:
-  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, AlsaMinder *inputSource, TCPConnection *outputConnection);
+  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, TCPConnection *outputConnection);
   ~PluginRunner();
   int loadPlugin(ParamSet &ps);
-  void setInputSource(AlsaMinder *am);
   void handleData(long avail, int16_t *src0, int16_t *src1, int step, long long totalFrames, long long frameOfTimestamp, double frameTimestamp);
   void outputFeatures(Plugin::FeatureSet features, string prefix);
   string toJSON();
@@ -60,7 +58,7 @@ private:
   void delete_privates();
 };
 
-typedef std::set < PluginRunner *> PluginRunnerSet;
+typedef std::set < std::weak_ptr < PluginRunner >, std::owner_less<std::weak_ptr< PluginRunner > > > PluginRunnerSet;
 
 #include "AlsaMinder.hpp"
 
