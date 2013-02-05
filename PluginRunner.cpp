@@ -255,12 +255,11 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
 string PluginRunner::toJSON() {
   ostringstream s;
   s << "{" 
-    << "\"label\":\"" << label << "\","
     << "\"type\":\"PluginRunner\","
     << "\"devLabel\":\"" << devLabel << "\","
-    << "\"library\":\"" << pluginSOName << "\","
-    << "\"ID\":" << pluginID << ","
-    << "\"output\":" << pluginOutput << ","
+    << "\"libraryName\":\"" << pluginSOName << "\","
+    << "\"pluginID\":\"" << pluginID << "\","
+    << "\"pluginOutput\":\"" << pluginOutput << "\","
     << "\"totalFeatures\":" << totalFeatures
     << "}";
   return s.str();

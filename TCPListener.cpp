@@ -59,7 +59,7 @@ string TCPListener::toJSON() {
   ostringstream s;
   s << "{" 
     << "\"type\":\"TCPListener\","
-    << "\"label\":\"" << label << "\""
+    << "\"port\":\"" << server_port_num << "\""
     << "}";
   return s.str();
 }

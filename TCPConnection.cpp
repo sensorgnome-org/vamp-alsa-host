@@ -169,7 +169,7 @@ string TCPConnection::toJSON() {
   ostringstream s;
   s << "{" 
     << "\"type\":\"TCPConnection\","
-    << "\"label\":\"" << label << "\""
+    << "\"fileDescriptor\":" << pollfd.fd
     << "}";
   return s.str();
 }

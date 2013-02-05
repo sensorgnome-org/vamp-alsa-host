@@ -138,7 +138,6 @@ string AlsaMinder::about() {
 string AlsaMinder::toJSON() {
   ostringstream s;
   s << "{" 
-    << "\"label\":\"" << label << "\","
     << "\"type\":\"AlsaMinder\","
     << "\"device\":\"" << alsaDev << "\","
     << "\"rate\":" << rate << ","

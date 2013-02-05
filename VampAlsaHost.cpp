@@ -330,7 +330,7 @@ VampAlsaHost::commandHelp =
     "          [PAR VALUE]: an optional set of plugin parameter settings, where:\n"
     "                       PAR: is the name of a plugin parameter\n"
     "                       VALUE: is the value to be assiged to the parameter\n\n"
-    "          e.g. attach 3 pulse3 lotek-plugins.so findpulsefdbatch pulses minsnr=6\n\n"
+    "          e.g. attach 3 pulse3 lotek-plugins.so findpulsefdbatch pulses minsnr 6\n\n"
     "          Output from the plugin will be sent to the TCP connection which issued the 'attach' command\n\n"
 
     "       detach PLUGIN_LABEL\n"
