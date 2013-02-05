@@ -39,9 +39,9 @@ protected:
   snd_pcm_uframes_t  period_frames;    // period size given to us by ALSA (we attempt to specify it)
   unsigned short     revents;          // demangled version of revent returned after poll()
   long long          totalFrames;      // total frames seen on this FCD since start of capture
-  double             startTimestamp;   // timestamp device was (most recently) started (-1 if never)
-  double             stopTimestamp;    // timestamp device was (most recently) stopped or opened (-1 if not opened yet)
-  double             lastDataReceived; // time at which data was last received; used to detect random FCD stop (e.g. due to hub device reset)
+  double             startTimestamp;   // timestamp device was (most recently) started (-1 if never)  CLOCK_REALTIME
+  double             stopTimestamp;    // timestamp device was (most recently) stopped or opened (-1 if not opened yet) CLOCK_REALTIME
+  double             lastDataReceived; // time at which data was last received; used to detect random FCD stop (e.g. due to hub device reset) CLOCK_MONOTONIC
   bool               shouldBeRunning;  // should this FCD be running?
   bool               stopped;          // is this FCD stopped?  (by which we mean not streaming USB audio)
   int                hasError;         // if non-zero, the most recent error this device got while we polled it? (this would have stopped it)

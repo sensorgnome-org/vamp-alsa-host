@@ -113,6 +113,7 @@ AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &
   totalFrames(0),
   startTimestamp(-1.0),
   stopTimestamp(now),
+  lastDataReceived(-1.0),
   shouldBeRunning(false),
   stopped(true),
   hasError(0),
@@ -293,7 +294,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         cerr << about() << ": snd_pcm_mmap_commit returned error." << endl;
       }
     }
-  } else if (shouldBeRunning && timeNow - lastDataReceived > MAX_FCD_QUIET_TIME) {
+  } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_FCD_QUIET_TIME) {
     // this fcd appears to have stopped delivering audio; try restart it
     cerr << about() << " has not sent data for " << timeNow - lastDataReceived << " s; restarting." << endl;
     lastDataReceived = timeNow; // wait before next restart

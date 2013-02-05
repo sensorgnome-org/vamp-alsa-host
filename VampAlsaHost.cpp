@@ -91,7 +91,7 @@ void VampAlsaHost::poll(int timeout) {
     int i = ptr->indexInPollFD;
     if (i < 0)
       continue;
-    ptr->handleEvents(&pollfds[i], timedOut, now (false));
+    ptr->handleEvents(&pollfds[i], timedOut, now());
   }
   doing_poll = false;
   doDeferrals();
@@ -140,7 +140,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     ostringstream reply;
     string word;
     istringstream cmd(cmdString);
-    double timeNow = now();
+    double realTimeNow = now(false);
     if (! (cmd >> word))
         return reply.str();
     if (word == "stopAll") {
@@ -149,7 +149,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         t.tv_sec = 0;
         t.tv_nsec = 50 * 1000 * 1000;
         for (PollableSet::iterator ips = pollables.begin(); ips != pollables.end(); ++ips) {
-            ips->second->stop(timeNow);
+            ips->second->stop(realTimeNow);
             // sleep 50 ms between stops
             nanosleep(&t, 0);
         }
@@ -161,7 +161,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         t.tv_sec = 0;
         t.tv_nsec = 500 * 1000 * 1000;
         for (PollableSet::iterator ips = pollables.begin(); ips != pollables.end(); ++ips) {
-            ips->second->start(timeNow);
+            ips->second->start(realTimeNow);
             // sleep 500 ms between starts
             nanosleep(&t, 0);
         }
@@ -190,9 +190,9 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         Pollable *p = lookupByName(label);
         if (p) {
             if (doStop)
-                p->stop(timeNow);
+                p->stop(realTimeNow);
             else
-                p->start(timeNow);
+                p->start(realTimeNow);
             reply << p->toJSON();
             requestPollFDRegen();
         } else {
@@ -218,7 +218,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         int rate, numChan;
         cmd >> label >> alsaDev >> rate >> numChan;
         try {
-            std::shared_ptr < AlsaMinder > ptr = std::make_shared < AlsaMinder > (alsaDev, rate, numChan, label, timeNow, this);
+            std::shared_ptr < AlsaMinder > ptr = std::make_shared < AlsaMinder > (alsaDev, rate, numChan, label, realTimeNow, this);
             add(ptr);
             reply << ptr->toJSON();
         } catch (std::runtime_error e) {
@@ -229,7 +229,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         cmd >> label;
         AlsaMinder *dev = dynamic_cast < AlsaMinder * > (lookupByName(label));
         if (dev) {
-            dev->stop(timeNow);
+            dev->stop(realTimeNow);
             reply << dev->toJSON();
             remove(label);
         } else {
