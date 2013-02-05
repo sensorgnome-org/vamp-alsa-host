@@ -23,7 +23,9 @@ int TCPConnection::getPollFDs (struct pollfd * pollfds) {
 };
 
 void TCPConnection::queueFloatOutput(std::vector < float > & f) {
-  outputFloatBuffer.insert(outputFloatBuffer.end(), f.begin(), f.end());
+  int len = std::min((int) f.size(), (int) (outputFloatBuffer.capacity() / sizeof(float)));
+  
+  outputFloatBuffer.insert(outputFloatBuffer.end(), f.begin(), f.begin() + len);
   pollfd.events |= POLLOUT;
   if (indexInPollFD >= 0)
     host->eventsOf(this) = pollfd.events;
@@ -39,6 +41,8 @@ void TCPConnection::queueTextOutput(string s) {
 };
 
 void TCPConnection::queueRawOutput(const char *p, int len, int granularity) {
+  len = std::min(len, (int) outputRawBuffer.capacity());
+  len = len - len % granularity;
   outputRawBuffer.insert(outputRawBuffer.end(), p, p+len);
   outputRawBufferGranularity = granularity;
   pollfd.events |= POLLOUT;

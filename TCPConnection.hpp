@@ -22,7 +22,7 @@ protected:
   static const unsigned MAX_CMD_STRING_LENGTH = 256;    // size of buffer for receiving commands over TCP
   static const unsigned MAX_OUTPUT_FLOAT_BUFFER_SIZE = 8192;  // maximum size of float output buffer = 2K floats
   static const unsigned MAX_OUTPUT_LINE_BUFFER_SIZE = 128; // max # of text lines buffered for output
-  static const unsigned MAX_OUTPUT_RAW_BUFFER_SIZE = 8192; // maximum size of raw frame buffer in bytes; = 2k stereo 16-bit frames
+  static const unsigned MAX_OUTPUT_RAW_BUFFER_SIZE = 32768; // maximum size of raw frame buffer in bytes; = 8k stereo 16-bit frames
 
   char cmdString[MAX_CMD_STRING_LENGTH + 1];    // buffer for input from TCP
   string inputBuff;   // input from TCP socket which has not been processed yet
