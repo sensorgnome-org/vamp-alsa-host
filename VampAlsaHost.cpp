@@ -56,7 +56,7 @@ Pollable * VampAlsaHost::lookupByName (std::string& label) {
 
 std::shared_ptr < Pollable > VampAlsaHost::lookupByNameShared (std::string& label) {
   if (pollables.count(label) == 0)
-    return 0;
+    return std::shared_ptr < Pollable > ((Pollable *) 0);
   return pollables[label];
 };
 

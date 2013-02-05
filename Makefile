@@ -10,25 +10,25 @@ clean:
 	rm -f *.o vamp-alsa-host
 
 AlsaMinder.o: AlsaMinder.cpp
-	gcc $(CCOPTS) -c -o $@ $<
+	g++ $(CCOPTS) -c -o $@ $<
 
 PluginRunner.o: PluginRunner.cpp
-	gcc $(CCOPTS) -c -o $@ $<
+	g++ $(CCOPTS) -c -o $@ $<
 
 VampAlsaHost.o: VampAlsaHost.cpp
-	gcc $(CCOPTS) -c -o $@ $<
+	g++ $(CCOPTS) -c -o $@ $<
 
 TCPListener.o: TCPListener.cpp
-	gcc $(CCOPTS) -c -o $@ $<
+	g++ $(CCOPTS) -c -o $@ $<
 
 TCPConnection.o: TCPConnection.cpp
-	gcc $(CCOPTS) -c -o $@ $<
+	g++ $(CCOPTS) -c -o $@ $<
 
 vamp-alsa-host.o: vamp-alsa-host.cpp
-	gcc $(CCOPTS) -c -o $@ $<
+	g++ $(CCOPTS) -c -o $@ $<
 
 vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o PluginRunner.o VampAlsaHost.o AlsaMinder.o
-	gcc $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk
+	g++ $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
