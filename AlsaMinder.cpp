@@ -217,17 +217,19 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       snd_pcm_htimestamp(pcm, &av, &ts);
       frameTimestamp = ts.tv_sec + (double) ts.tv_nsec / 1.0e9;
       frameOfTimestamp = totalFrames + av;
-      totalFrames += avail;
 
       // begin direct access to ALSA mmap buffers for the device
       const snd_pcm_channel_area_t *areas;
       snd_pcm_uframes_t offset;
       snd_pcm_uframes_t have = (snd_pcm_sframes_t) avail;
+
       if ( snd_pcm_mmap_begin (pcm, & areas, & offset, & have) ) {
         cerr << about() << ": snd_pcm_mmap_begin returned error." << endl;
         return;
       }
-
+      avail = have;
+   
+      totalFrames += avail;
       int16_t *src0, *src1=0; // avoid compiler warning
       int step;
 

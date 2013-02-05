@@ -127,10 +127,10 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
       } else {
         int partial = num_bytes % outputRawBufferGranularity;
         if (partial != 0) {
-          // PITA: wrote part of a float; we at least want to prevent these from being broken up
+          // PITA: wrote part of a frame; we at least want to prevent these from being broken up
           outputPartialLine = string( ((char *) aone.first) + num_bytes, outputRawBufferGranularity - partial);
         }
-        outputRawBuffer.erase_begin((num_bytes + outputRawBufferGranularity - 1) / outputRawBufferGranularity); // round up to number of floats at least partially written
+        outputRawBuffer.erase_begin((num_bytes + outputRawBufferGranularity - 1) / outputRawBufferGranularity * outputRawBufferGranularity); // round up to number of floats at least partially written
       }
     }
 
