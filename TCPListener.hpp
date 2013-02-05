@@ -4,6 +4,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <iostream>
+#include <sstream>
 
 #include "Pollable.hpp"
 
@@ -11,14 +13,11 @@
 
 class TCPListener : public Pollable {
 
-  typedef  void (*NewConnectionHandler) (int fd);
-
  protected:
   struct pollfd pollfd;
   struct sockaddr_in serv_addr;
   int SO_REUSEADDR_ON;
   int server_port_num;
-  NewConnectionHandler newConnectionHandler;
 
  public:
 
@@ -28,7 +27,13 @@ class TCPListener : public Pollable {
 
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
-  TCPListener(int server_port_num, NewConnectionHandler newConnectionHandler);
-};
+  TCPListener(int server_port_num, string label, VampAlsaHost *host);
 
+  void stop(double timeNow);
+
+  int start(double timeNow);
+
+  string toJSON();
+
+};
 #endif // TCPLISTENER_HPP

@@ -15,16 +15,18 @@ void TCPListener::handleEvents (struct pollfd *pollfds, bool timedOut, double ti
     socklen_t clilen = sizeof(cli_addr);
     int conn_fd = accept4(pollfd.fd, (struct sockaddr *) &cli_addr, &clilen, SOCK_NONBLOCK);
     if (conn_fd >= 0) {
-      newConnectionHandler(conn_fd);
+      ostringstream label("TCPFD#", std::ios_base::app);
+      label << conn_fd;
+      auto conn = std::make_shared < TCPConnection > (conn_fd, host, label.str());
+      host->add(conn);
     }
   }
 };
 
-TCPListener::TCPListener(int server_port_num, NewConnectionHandler newConnectionHandler) : 
-  Pollable(0),
+TCPListener::TCPListener(int server_port_num, string label, VampAlsaHost *host) : 
+  Pollable(host, label),
   SO_REUSEADDR_ON(1),
-  server_port_num(server_port_num),
-  newConnectionHandler(newConnectionHandler)
+  server_port_num(server_port_num)
 {
     
   pollfd.fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -44,3 +46,20 @@ TCPListener::TCPListener(int server_port_num, NewConnectionHandler newConnection
   if (listen(pollfd.fd, 5))
     throw std::runtime_error(string("Error listening on port\n"));
 };
+
+void TCPListener::stop(double timeNow) {
+  /* do nothing */
+};
+
+int TCPListener::start(double timeNow) {
+  return 0;
+};
+
+string TCPListener::toJSON() {
+  ostringstream s;
+  s << "{" 
+    << "\"type\":\"TCPListener\","
+    << "\"label\":\"" << label << "\""
+    << "}";
+  return s.str();
+}

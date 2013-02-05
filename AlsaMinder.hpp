@@ -8,13 +8,14 @@
 #include <memory>
 
 using namespace std;
+
 #include <alsa/asoundlib.h>
 
 #include "Pollable.hpp"
 #include "PluginRunner.hpp"
 #include "TCPConnection.hpp"
 
-typedef std::map < TCPConnection *, std::weak_ptr < TCPConnection > > RawListenerSet;
+typedef std::map < string, std::weak_ptr < TCPConnection > > RawListenerSet;
 typedef std::map < PluginRunner *, std::weak_ptr < PluginRunner > > PluginRunnerSet;
 
 class AlsaMinder : public Pollable {
@@ -28,7 +29,6 @@ public:
   string             alsaDev;          // ALSA path to fcd device (e.g. hw:CARD=V10)
   int                rate;             // sampling rate to use for device
   unsigned int       numChan;          // number of channels to read from device
-  string             label;            // prefix for lines of output arising from this device, to distinguish them from other devices' output
 
 protected:
 
@@ -51,17 +51,13 @@ protected:
 public:
 
   int open();
-  void stop(double timeNow);
-  void requestStop(double timeNow);
-  int start(double timeNow);
-  int requestStart(double timeNow);
   void addPluginRunner(std::shared_ptr < PluginRunner > pr);
   void removePluginRunner(std::shared_ptr < PluginRunner > pr);
-  void addRawListener(std::shared_ptr < TCPConnection > conn);
-  void removeRawListener(std::shared_ptr < TCPConnection > conn);
+  void addRawListener(string connLabel);
+  void removeRawListener(string connLabel);
   void removeAllRawListeners();
 
-  AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, PollableMinder * minder);
+  AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, VampAlsaHost * host);
 
   ~AlsaMinder();
 
@@ -74,10 +70,15 @@ public:
   virtual int getPollFDs (struct pollfd *pollfds);
 
   virtual void handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow);
+  int start(double timeNow);
+  void stop(double timeNow);
+
 
 protected:
   
   void delete_privates();
+  int do_start(double timeNow);
+  void do_stop(double timeNow);
 
 };
 

@@ -1,7 +1,7 @@
 #include "TCPConnection.hpp"
 
-TCPConnection::TCPConnection (int fd, PollableMinder * minder) : 
-  Pollable(minder),
+TCPConnection::TCPConnection (int fd, VampAlsaHost * host, string label) : 
+  Pollable(host, label),
   outputLineBuffer(MAX_OUTPUT_LINE_BUFFER_SIZE),
   outputFloatBuffer(MAX_OUTPUT_FLOAT_BUFFER_SIZE),
   outputRawBuffer(MAX_OUTPUT_RAW_BUFFER_SIZE)
@@ -25,8 +25,8 @@ int TCPConnection::getPollFDs (struct pollfd * pollfds) {
 void TCPConnection::queueFloatOutput(std::vector < float > & f) {
   outputFloatBuffer.insert(outputFloatBuffer.end(), f.begin(), f.end());
   pollfd.events |= POLLOUT;
-  if (inPollFD)
-    minder->eventsOf(this) = pollfd.events;
+  if (indexInPollFD >= 0)
+    host->eventsOf(this) = pollfd.events;
 };
 
 void TCPConnection::queueTextOutput(string s) {
@@ -34,28 +34,29 @@ void TCPConnection::queueTextOutput(string s) {
     return;
   outputLineBuffer.push_back(s);
   pollfd.events |= POLLOUT;
-  if (inPollFD)
-    minder->eventsOf(this) = pollfd.events;
+  if (indexInPollFD >= 0)
+    host->eventsOf(this) = pollfd.events;
 };
 
 void TCPConnection::queueRawOutput(const char *p, int len, int granularity) {
   outputRawBuffer.insert(outputRawBuffer.end(), p, p+len);
   outputRawBufferGranularity = granularity;
   pollfd.events |= POLLOUT;
-  if (inPollFD)
-    minder->eventsOf(this) = pollfd.events;
+  if (indexInPollFD >= 0)
+    host->eventsOf(this) = pollfd.events;
 };
     
 void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
 
   // set whether or not to watch for POLLOUT
-  // kludgey to do it here, but this has access to the PollableMinder's
+  // kludgey to do it here, but this has access to the VampAlsaHost's
   // set of pollfds, so we can set the events field there.
 
   if (pollfds->revents & (POLLIN | POLLRDHUP)) {
     // handle read 
     int len = read(pollfd.fd, cmdString, MAX_CMD_STRING_LENGTH);
     if (len <= 0) {
+      host->remove(label);
       // socket has been closed, apparently
       // FIXME: delete this connection via shared_ptr in connections
       return;
@@ -76,8 +77,7 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
     // last MAX_CMD_STRING_LENGTH characters of inputBuff, removing the command
     // will keep that buffer's length <= MAX_CMD_STRING_LENGTH
     inputBuff.erase(0, pos + 1);
-    if (commandHandler)
-      queueTextOutput(commandHandler(cmd, this)); // call the toplevel
+    queueTextOutput(host->runCommand(cmd, label)); // call the toplevel
   }
 
   if (pollfds->revents & (POLLOUT)) {
@@ -147,13 +147,25 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
         outputFloatBuffer.erase_begin((num_bytes + sizeof(float) - 1) / sizeof(float)); // round up to number of floats at least partially written
       }
     } else {
-      minder->eventsOf(this) &= ~POLLOUT;
+      host->eventsOf(this) &= ~POLLOUT;
     }
   }
 };
 
-void TCPConnection::setCommandHandler (CommandHandler commandHandler) {
-  TCPConnection::commandHandler = commandHandler;
+void TCPConnection::stop(double timeNow) {
+  /* do nothing */
 };
 
-CommandHandler TCPConnection::commandHandler = 0;
+int TCPConnection::start(double timeNow) {
+  /* do nothing */
+  return 0;
+};
+
+string TCPConnection::toJSON() {
+  ostringstream s;
+  s << "{" 
+    << "\"type\":\"TCPConnection\","
+    << "\"label\":\"" << label << "\""
+    << "}";
+  return s.str();
+}

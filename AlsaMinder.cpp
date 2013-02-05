@@ -44,8 +44,8 @@ int AlsaMinder::open() {
   return 0;
 };
 
-void AlsaMinder::stop(double timeNow) {
-  minder->requestPollFDRegen();
+void AlsaMinder::do_stop(double timeNow) {
+  host->requestPollFDRegen();
   if (pcm) {
     snd_pcm_drop(pcm);
     snd_pcm_close(pcm);
@@ -55,15 +55,15 @@ void AlsaMinder::stop(double timeNow) {
   stopped = true;
 };
 
-void AlsaMinder::requestStop(double timeNow) {
+void AlsaMinder::stop(double timeNow) {
   shouldBeRunning = false;
-  stop(timeNow);
+  do_stop(timeNow);
 };
 
-int AlsaMinder::start(double timeNow) {
+int AlsaMinder::do_start(double timeNow) {
   if (!pcm && open())
     return 1;
-  minder->requestPollFDRegen();
+  host->requestPollFDRegen();
   snd_pcm_prepare(pcm);
   hasError = 0;
   snd_pcm_start(pcm);
@@ -72,9 +72,9 @@ int AlsaMinder::start(double timeNow) {
   return 0;
 }
 
-int AlsaMinder::requestStart(double timeNow) {
+int AlsaMinder::start(double timeNow) {
   shouldBeRunning = true;
-  return start(timeNow);
+  return do_start(timeNow);
 };
 
 void AlsaMinder::addPluginRunner(std::shared_ptr < PluginRunner > pr) {
@@ -86,24 +86,26 @@ void AlsaMinder::removePluginRunner(std::shared_ptr < PluginRunner > pr) {
   plugins.erase(pr.get());
 };
 
-void AlsaMinder::addRawListener(std::shared_ptr < TCPConnection > conn) {
-  rawListeners[conn.get()] = conn;
+void AlsaMinder::addRawListener(string connLabel) {
+  
+  std::shared_ptr < TCPConnection > conn = static_pointer_cast < TCPConnection > (host->lookupByNameShared(connLabel));
+  if (conn)
+    rawListeners[connLabel] = conn;
 };
 
-void AlsaMinder::removeRawListener(std::shared_ptr < TCPConnection > conn) {
-  rawListeners.erase(conn.get());
+void AlsaMinder::removeRawListener(string connLabel) {
+  rawListeners.erase(connLabel);
 };
 
 void AlsaMinder::removeAllRawListeners() {
   rawListeners.clear();
 };
 
-AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, PollableMinder *minder):
-  Pollable(minder),
+AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, VampAlsaHost *minder):
+  Pollable(minder, label),
   alsaDev(alsaDev),
   rate(rate),
   numChan(numChan),
-  label(label),
   pcm(0),
   buffer_frames(BUFFER_FRAMES),
   period_frames(PERIOD_FRAMES),
@@ -136,6 +138,7 @@ string AlsaMinder::toJSON() {
   ostringstream s;
   s << "{" 
     << "\"label\":\"" << label << "\","
+    << "\"type\":\"AlsaMinder\","
     << "\"device\":\"" << alsaDev << "\","
     << "\"rate\":" << rate << ","
     << "\"numChan\":" << numChan << ","
@@ -181,7 +184,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
   if (revents & POLLERR) {
     hasError = errno;
     stopped = true;
-    minder->requestPollFDRegen();
+    host->requestPollFDRegen();
     stop(timeNow);
     if (start(timeNow)) {
       cerr << "Poll returned with error " << hasError << " on device " << alsaDev << ". Will wait and retry opening.";
@@ -268,7 +271,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
           src1 += step * offset;
         }
         if (auto ptr = (ip->second).lock()) {
-          ptr->handleData(avail, src0, src1, step, totalFrames, frameTimestamp, frameOfTimestamp);
+          ptr->handleData(avail, src0, src1, step, totalFrames, frameOfTimestamp, frameTimestamp);
           ++ip;
         } else {
           PluginRunnerSet::iterator to_delete = ip++;
@@ -296,7 +299,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
     lastDataReceived = timeNow; // wait before next restart
     stop(timeNow);
     start(timeNow);
-    minder->requestPollFDRegen();
+    host->requestPollFDRegen();
   }
 };
         

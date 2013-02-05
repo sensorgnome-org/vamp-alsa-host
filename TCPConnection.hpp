@@ -13,7 +13,7 @@ using std::istringstream;
 class TCPConnection;
 
 // type that handles commands
-typedef string (*CommandHandler) (string, TCPConnection *);
+typedef string (*CommandHandler) (string cmd, string connLabel);
 
 class TCPConnection : public Pollable {
 
@@ -32,11 +32,10 @@ protected:
   int outputRawBufferGranularity; // granularity of raw output, in bytes; each chunk is either sent or not; no partial chunks are sent.
 
   string outputPartialLine; // if only part of an output chunk has been sent on the connection, this holds the rest
-  static CommandHandler commandHandler;
 
 public:
 
-  TCPConnection (int fd, PollableMinder *minder);
+  TCPConnection (int fd, VampAlsaHost *minder, string label);
   
   int getNumPollFDs() { return 1;};
 
@@ -50,7 +49,11 @@ public:
     
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
-  static void setCommandHandler (CommandHandler commandHandler);
+  void stop(double timeNow);
+
+  int start(double timeNow);
+
+  string toJSON();
 };
 
 #endif // TCPCONNECTION_HPP

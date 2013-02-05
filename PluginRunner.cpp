@@ -113,13 +113,15 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
   return 0;
 };
 
-PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, std::shared_ptr < TCPConnection > outputConnection):
+PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, std::shared_ptr < Pollable > outputConnection, VampAlsaHost *host):
+  Pollable (host, label),
   label(label),
   devLabel(devLabel),
   pluginSOName(pluginSOName),
   pluginID(pluginID),
   pluginOutput(pluginOutput),
   pluginParams(ps),
+  host(host),
   rate(rate),
   numChan(numChan),
   totalFeatures(0),
@@ -129,8 +131,7 @@ PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numCha
   blockSize(0),
   stepSize(0),
   framesInPlugBuf(0),
-  isOutputBinary(false),
-  outputConnection(outputConnection)
+  isOutputBinary(false)
 {
 
   // try load the plugin and throw if we fail
@@ -139,6 +140,7 @@ PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numCha
     delete_privates();
     throw std::runtime_error("Could not load plugin or plugin is not compatible");
   }
+  this->outputConnection = static_pointer_cast < TCPConnection > (outputConnection);
 };
 
 PluginRunner::~PluginRunner() {
@@ -210,7 +212,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
 {
   auto ptr = outputConnection.lock();
   if (! ptr) {
-    // FIXME: my output connection has died; I should die too
+    host->remove(label);
     return;
   }
   
@@ -254,6 +256,7 @@ string PluginRunner::toJSON() {
   ostringstream s;
   s << "{" 
     << "\"label\":\"" << label << "\","
+    << "\"type\":\"PluginRunner\","
     << "\"devLabel\":\"" << devLabel << "\","
     << "\"library\":\"" << pluginSOName << "\","
     << "\"ID\":" << pluginID << ","
@@ -265,3 +268,37 @@ string PluginRunner::toJSON() {
 
 PluginLoader *PluginRunner::pluginLoader = 0;
 
+/*
+  Trivially implementing the following methods allow us to put
+  PluginRunners in the same host container as TCPListeners,
+  TCPConnections, and AlsaMinders.  It's an ugly design, but I
+  couldn't think of a better one, and it makes for simpler code, as
+  far as I can tell.  */
+
+void PluginRunner::stop(double timeNow) {
+  /* do nothing */
+};
+
+int
+PluginRunner::start(double timeNow) {
+  /* do nothing */
+  return 0;
+};
+
+int
+PluginRunner::getNumPollFDs() {
+  /* do nothing */
+  return 0;
+};
+
+int 
+PluginRunner::getPollFDs (struct pollfd * pollfds) {
+  /* do nothing */
+  return 0;
+};
+
+void
+PluginRunner::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow)
+{
+  /* do nothing */
+};

@@ -15,11 +15,12 @@ using namespace Vamp;
 using namespace Vamp::HostExt;
 
 #include "ParamSet.hpp"
+#include "Pollable.hpp"
 #include "TCPConnection.hpp"
 
 class AlsaMinder;
 
-class PluginRunner {
+class PluginRunner : public Pollable {
 public:
   string             label;            // name of this plugin runner (used in commands)
   string             devLabel;         // label of device from which plugin receives input
@@ -30,6 +31,7 @@ public:
 
 protected:
   static PluginLoader *pluginLoader;   // plugin loader (singleton)
+  VampAlsaHost *     host;             // host
   int                rate;             // sampling rate; frames per second
   unsigned int       numChan;          // number of channels plugin uses
   long long          totalFeatures;    // total number of "features" (e.g. lotek pulses) seen on this FCD
@@ -45,15 +47,26 @@ protected:
   // is either completely written or not written at all.  For binary output,
   // we just discard at arbitrary boundaries.
 
-  std::weak_ptr < TCPConnection >    outputConnection; // connection to which output is written
+  std::weak_ptr < TCPConnection >  outputConnection; // connection to which output is written
 
 public:
-  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, std::shared_ptr < TCPConnection > outputConnection);
+  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, std::shared_ptr < Pollable > outputConnection, VampAlsaHost *host);
   ~PluginRunner();
   int loadPlugin(ParamSet &ps);
   void handleData(long avail, int16_t *src0, int16_t *src1, int step, long long totalFrames, long long frameOfTimestamp, double frameTimestamp);
   void outputFeatures(Plugin::FeatureSet features, string prefix);
   string toJSON();
+
+  int getNumPollFDs();
+                      // return number of fds used by this Pollable (negative means error)
+  int getPollFDs (struct pollfd * pollfds);
+
+  void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
+
+  void stop(double timeNow);
+
+  int start(double timeNow);
+
 
 private:
   void delete_privates();

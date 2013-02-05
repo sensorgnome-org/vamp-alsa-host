@@ -1,5 +1,5 @@
-#ifndef POLLABLEMINDER_HPP
-#define POLLABLEMINDER_HPP
+#ifndef VAMPALSAHOST_HPP
+#define VAMPALSAHOST_HPP
 
 /*
   Manage a set of pollable objects, do polling, and call the object when events occur.
@@ -21,36 +21,39 @@ using std::ostringstream;
 
 class Pollable;
 
-typedef std::map < Pollable *, std::weak_ptr < Pollable > > PollableSet;
-typedef std::map < Pollable *, int > PollableIndex;
+typedef std::map < std::string, std::shared_ptr < Pollable > > PollableSet;
 
-class PollableMinder {
+class VampAlsaHost {
 
 protected:
-  PollableSet pollables; // maintained in same order as pollfds, but might not be of same length if some objects have more than one FD
-  // this object owns the objects pointed to
-  std::vector <struct pollfd> pollfds;
-  PollableIndex first_pollfd; // map of Pollable * to index of first corresponding struct pollfd in pollfds
+  PollableSet pollables; // map of Pollables, indexed by label, values are shared pointers; this owns its objects
+  std::vector <struct pollfd> pollfds; // in same order as pollables, but some pollables may have 0 or more than 1 FD
   PollableSet deferred_adds;
   PollableSet deferred_removes;
   bool regen_pollfds;
   bool have_deferrals;
   bool doing_poll;
+
 public:
-  
-  PollableMinder();
+  VampAlsaHost();
   void add(std::shared_ptr < Pollable > p);
   void remove(std::shared_ptr < Pollable > p);
   void remove(std::weak_ptr < Pollable > p);
+  void remove(string& label);
   void remove(Pollable * p);
+  Pollable * lookupByName (std::string& label);
+  std::shared_ptr < Pollable > lookupByNameShared (std::string& label);
   short & eventsOf(Pollable *p, int offset = 0); // reference to the events field for a pollfd
   void requestPollFDRegen();
-  int poll(int timeout, double (*now)(bool isRealtime));
+  void poll(int timeout);
+  string runCommand(string cmdString, string connLabel);
+  void run();
+  double now(bool is_monotonic = true);
+  static const string commandHelp;
 
 protected:
-
   void doDeferrals();  
   void regenFDs();
 };
 
-#endif // POLLABLEMINDER_HPP
+#endif // VAMPALSAHOST_HPP
