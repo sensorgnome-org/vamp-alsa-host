@@ -33,6 +33,8 @@ protected:
 
   string outputPartialLine; // if only part of an output chunk has been sent on the connection, this holds the rest
 
+  unsigned long long rawBytesSent; // keep track of count of raw bytes, so user can know when to send a header
+
 public:
 
   TCPConnection (int fd, VampAlsaHost *minder, string label);
@@ -54,6 +56,10 @@ public:
   int start(double timeNow);
 
   string toJSON();
+
+  unsigned long long getRawBytesSent();
+
+  void resetRawBytesSent();
 };
 
 #endif // TCPCONNECTION_HPP

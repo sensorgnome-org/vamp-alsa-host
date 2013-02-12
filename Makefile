@@ -2,12 +2,17 @@ CCOPTS_PRODUCTION :=  -std=c++0x -I. -O3 -Wall -fPIC -ftree-vectorize -ffast-mat
 
 CCOPTS_DEBUG :=  -std=c++0x -I. -g3 -Wall -fPIC -ftree-vectorize -ffast-math
 
-CCOPTS := $(CCOPTS_DEBUG)
+CCOPTS := $(CCOPTS_PRODUCTION)
+#CCOPTS := $(CCOPTS_DEBUG)
 
 all: vamp-alsa-host
 
 clean:
 	rm -f *.o vamp-alsa-host
+
+install: vamp-alsa-host
+	strip vamp-alsa-host
+	cp vamp-alsa-host /usr/bin
 
 AlsaMinder.o: AlsaMinder.cpp
 	g++ $(CCOPTS) -c -o $@ $<
@@ -33,13 +38,20 @@ vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o PluginRunner.o V
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
 AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
-AlsaMinder.o: ParamSet.hpp TCPConnection.hpp
-PluginRunner.o: PluginRunner.hpp ParamSet.hpp TCPConnection.hpp Pollable.hpp
-PluginRunner.o: VampAlsaHost.hpp AlsaMinder.hpp
-VampAlsaHost.o: VampAlsaHost.hpp Pollable.hpp
+AlsaMinder.o: ParamSet.hpp TCPConnection.hpp WavFileHeader.hpp
+PluginRunner.o: PluginRunner.hpp ParamSet.hpp Pollable.hpp VampAlsaHost.hpp
+PluginRunner.o: TCPConnection.hpp AlsaMinder.hpp
 TCPConnection.o: TCPConnection.hpp Pollable.hpp VampAlsaHost.hpp
 TCPListener.o: TCPListener.hpp Pollable.hpp VampAlsaHost.hpp
 TCPListener.o: TCPConnection.hpp
-vamp-alsa-host.o: ParamSet.hpp Pollable.hpp VampAlsaHost.hpp
-vamp-alsa-host.o: TCPListener.hpp TCPConnection.hpp PluginRunner.hpp
-vamp-alsa-host.o: AlsaMinder.hpp
+VampAlsaHost.o: VampAlsaHost.hpp Pollable.hpp AlsaMinder.hpp PluginRunner.hpp
+VampAlsaHost.o: ParamSet.hpp TCPConnection.hpp
+vamp-alsa-host.o: ParamSet.hpp Pollable.hpp VampAlsaHost.hpp TCPListener.hpp
+vamp-alsa-host.o: TCPConnection.hpp PluginRunner.hpp AlsaMinder.hpp
+AlsaMinder.o: Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp ParamSet.hpp
+AlsaMinder.o: TCPConnection.hpp AlsaMinder.hpp
+PluginRunner.o: ParamSet.hpp Pollable.hpp VampAlsaHost.hpp TCPConnection.hpp
+PluginRunner.o: AlsaMinder.hpp PluginRunner.hpp
+Pollable.o: VampAlsaHost.hpp
+TCPConnection.o: Pollable.hpp VampAlsaHost.hpp
+TCPListener.o: Pollable.hpp VampAlsaHost.hpp
