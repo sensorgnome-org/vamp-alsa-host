@@ -4,8 +4,7 @@ TCPConnection::TCPConnection (int fd, VampAlsaHost * host, string label) :
   Pollable(host, label),
   outputLineBuffer(MAX_OUTPUT_LINE_BUFFER_SIZE),
   outputFloatBuffer(MAX_OUTPUT_FLOAT_BUFFER_SIZE),
-  outputRawBuffer(MAX_OUTPUT_RAW_BUFFER_SIZE),
-  rawBytesSent(0)
+  outputRawBuffer(MAX_OUTPUT_RAW_BUFFER_SIZE)
 {
   pollfd.fd = fd;
   pollfd.events = POLLIN | POLLRDHUP;
@@ -45,7 +44,6 @@ void TCPConnection::queueRawOutput(const char *p, int len, int granularity) {
   len = std::min(len, (int) outputRawBuffer.capacity());
   len = len - len % granularity;
   outputRawBuffer.insert(outputRawBuffer.end(), p, p+len);
-  rawBytesSent += len;
   outputRawBufferGranularity = granularity;
   pollfd.events |= POLLOUT;
   if (indexInPollFD >= 0)
@@ -174,14 +172,4 @@ string TCPConnection::toJSON() {
     << "\"fileDescriptor\":" << pollfd.fd
     << "}";
   return s.str();
-}
-
-unsigned long long
-TCPConnection::getRawBytesSent() {
-  return rawBytesSent;
-};
-
-void 
-TCPConnection::resetRawBytesSent() {
-  rawBytesSent = 0;
 };

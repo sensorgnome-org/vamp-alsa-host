@@ -1,7 +1,5 @@
 #include "AlsaMinder.hpp"
 
-#include "WavFileHeader.hpp"
-
 void AlsaMinder::delete_privates() {
   if (pcm) {
     snd_pcm_drop(pcm);
@@ -91,11 +89,8 @@ void AlsaMinder::removePluginRunner(std::shared_ptr < PluginRunner > pr) {
 void AlsaMinder::addRawListener(string connLabel) {
   
   std::shared_ptr < TCPConnection > conn = static_pointer_cast < TCPConnection > (host->lookupByNameShared(connLabel));
-  if (conn) {
+  if (conn)
     rawListeners[connLabel] = conn;
-    WavFileHeader hdr(rate, numChan, 16, 3600); // FIXME:  S16_LE format assumption
-    conn->queueRawOutput((const char *) & hdr, sizeof(hdr), sizeof(hdr));
-  }
 };
 
 void AlsaMinder::removeRawListener(string connLabel) {
@@ -252,21 +247,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         //   of the first sample on channel 0
 
         if (auto ptr = (ir->second).lock()) {
-          unsigned long long frames_left = rate * 3600 - (ptr->getRawBytesSent() - sizeof(WavFileHeader)) / (numChan * 2);
-          if (frames_left > avail) {
-            ptr->queueRawOutput((char *) src0, avail * numChan * 2, numChan * 2);
-          } else {
-            ptr->queueRawOutput((char *) src0, frames_left * numChan * 2, numChan * 2);
-            WavFileHeader hdr(rate, numChan, 16, 3600); // FIXME:  S16_LE format assumption
-            conn->queueRawOutput((const char *) & hdr, sizeof(hdr), sizeof(hdr));
-
-
-            WavFileHeader
-
-
-              // TODO:  keep track of Raw bytes sent here, not in TCPConnection, so we know exactly when to 
-              // send header.
-
+          ptr->queueRawOutput((char *) src0, avail * numChan * 2, numChan * 2);
           ++ir;
         } else {
           RawListenerSet::iterator to_delete = ir++;

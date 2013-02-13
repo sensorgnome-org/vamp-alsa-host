@@ -38,7 +38,7 @@ vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o PluginRunner.o V
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
 AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
-AlsaMinder.o: ParamSet.hpp TCPConnection.hpp WavFileHeader.hpp
+AlsaMinder.o: ParamSet.hpp TCPConnection.hpp
 PluginRunner.o: PluginRunner.hpp ParamSet.hpp Pollable.hpp VampAlsaHost.hpp
 PluginRunner.o: TCPConnection.hpp AlsaMinder.hpp
 TCPConnection.o: TCPConnection.hpp Pollable.hpp VampAlsaHost.hpp
