@@ -18,6 +18,8 @@ using namespace Vamp::HostExt;
 #include "Pollable.hpp"
 #include "TCPConnection.hpp"
 
+typedef std::map < string, std::weak_ptr < TCPConnection > > OutputListenerSet;
+
 class AlsaMinder;
 
 class PluginRunner : public Pollable {
@@ -47,11 +49,16 @@ protected:
   // is either completely written or not written at all.  For binary output,
   // we just discard at arbitrary boundaries.
 
-  std::weak_ptr < TCPConnection >  outputConnection; // connection to which output is written
+  OutputListenerSet     outputListeners;     // connections receiving output from this plugin, if any.
 
 public:
-  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, std::shared_ptr < Pollable > outputConnection, VampAlsaHost *host);
+  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, VampAlsaHost *host);
   ~PluginRunner();
+
+  bool addOutputListener(string connLabel);
+  void removeOutputListener(string connLabel);
+  void removeAllOutputListeners();
+
   int loadPlugin(ParamSet &ps);
   void handleData(long avail, int16_t *src0, int16_t *src1, int step, long long totalFrames, long long frameOfTimestamp, double frameTimestamp);
   void outputFeatures(Plugin::FeatureSet features, string prefix);

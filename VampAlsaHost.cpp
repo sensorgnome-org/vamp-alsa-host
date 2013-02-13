@@ -253,9 +253,13 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
               throw std::runtime_error(string("There is no device with label '") + devLabel + "'");
             if (lookupByName(pluginLabel))
               throw std::runtime_error(string("There is already a device or plugin with label '") + pluginLabel + "'");
-            std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, dev->rate, dev->numChan, pluginLib, pluginName, outputName, ps, lookupByNameShared(connLabel), this);
+            std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, dev->rate, dev->numChan, pluginLib, pluginName, outputName, ps, this);
             pollables[pluginLabel] = static_pointer_cast < Pollable > (plugin);
             dev->addPluginRunner(plugin);
+            if (! plugin->addOutputListener(defaultOutputListener))
+              // the default output listener doesn't seem to exist any longer
+              // so reset its name in case a subsequent connection has the same label
+              defaultOutputListener = "";
             reply << plugin->toJSON() << '\n';
         } catch (std::runtime_error e) {
             reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
@@ -272,6 +276,28 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         } catch (std::runtime_error e) {
             reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
         };
+    } else if (word == "receive") {
+        string pluginLabel;
+        cmd >> pluginLabel;
+        try {
+            PollableSet::iterator ip = pollables.find(pluginLabel);
+            if (ip == pollables.end())
+                throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
+            std::shared_ptr < PluginRunner > p = dynamic_pointer_cast < PluginRunner > (ip->second);
+            auto ptr = p.get();
+            if (ptr)
+              ptr->addOutputListener(connLabel);
+        } catch (std::runtime_error e) {
+            reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
+        };
+    } else if (word == "receiveAll") {
+      for (PollableSet::iterator ip = pollables.begin(); ip != pollables.end(); ++ip) {
+        std::shared_ptr < PluginRunner > p = dynamic_pointer_cast < PluginRunner > (ip->second);
+        auto ptr = p.get();
+        if (ptr)
+          ptr->addOutputListener(connLabel);
+        defaultOutputListener = connLabel;
+      }
     } else if (word == "quit" ) {
         reply << "{\"message\": \"Terminating server.\"}\n";
         throw std::runtime_error("Quit by client.\n");
@@ -301,92 +327,113 @@ VampAlsaHost::now(bool is_monotonic) {
 };
 
 const string 
-VampAlsaHost::commandHelp =         
-    "       open DEV_LABEL AUDIO_DEV RATE NUM_CHANNELS\n"
-    "          Opens an audio device so that plugins can be attached to it.\n"
-    "          To start processing, you must attach a plugin and start the device\n"
-    "          using the 'start DEV_LABEL' command - see below\n\n"
-    "          Arguments:\n"
-    "          DEV_LABEL: a label which will identify this audio device in subsequent commands\n"
-    "             and in output lines.  This must not already be a label of another device\n"
-    "             or a plugin instance (see below).\n"
-    "          AUDIO_DEV: the ALSA name of the audio device (e.g. 'default:CARD=V10')\n"
-    "          RATE: the sampling rate to use for the device (e.g. 48000)\n"
-    "          NUM_CHANNELS: the number of channels to read from the device (usually 1 or 2)\n\n"
-    "          e.g. open 3 default:CARD=V10_2 48000 2\n\n"
+VampAlsaHost::commandHelp =
+            "       open DEV_LABEL AUDIO_DEV RATE NUM_CHANNELS\n"
+            "          Opens an audio device so that plugins can be attached to it.\n"
+            "          To start processing, you must attach a plugin and start the device\n"
+            "          using the 'start DEV_LABEL' command - see below\n\n"
+            "          Arguments:\n"
+            "          DEV_LABEL: a label which will identify this audio device in subsequent commands\n"
+            "             and in output lines.  This must not already be a label of another device\n"
+            "             or a plugin instance (see below).\n"
+            "          AUDIO_DEV: the ALSA name of the audio device (e.g. 'default:CARD=V10')\n"
+            "          RATE: the sampling rate to use for the device (e.g. 48000)\n"
+            "          NUM_CHANNELS: the number of channels to read from the device (usually 1 or 2)\n\n"
+            "          e.g. open 3 default:CARD=V10_2 48000 2\n\n"
 
-    "       attach DEV_LABEL PLUGIN_LABEL PLUGIN_SONAME PLUGIN_ID PLUGIN_OUTPUT [PAR VALUE]*\n"
-    "          Load the specified plugin and attach it to the specified audio device.  Multiple plugins\n"
-    "          can be attached to the same device.  All incoming data is sent to all attached\n"
-    "          plugins, in the same order in which they were attached.\n"
-    "          DEV_LABEL: the label for the input device, which must already have been opened with open\n"
-    "          PLUGIN_LABEL: the label for this plugin instance, for use in subsequent commands.\n"
-    "          This label must not already be the label of a device or another plugin instance.\n"
-    "          PLUGIN_SONAME: the name (without path) of the library containing the plugin\n"
-    "          PLUGIN_ID: the name of the plugin within the library\n"
-    "          PLUGIN_OUTPUT: the name of the desired output from the plugin\n"
-    "                         (some plugins have multiple outputs - you must pick one)\n"
-    "          [PAR VALUE]: an optional set of plugin parameter settings, where:\n"
-    "                       PAR: is the name of a plugin parameter\n"
-    "                       VALUE: is the value to be assiged to the parameter\n\n"
-    "          e.g. attach 3 pulse3 lotek-plugins.so findpulsefdbatch pulses minsnr 6\n\n"
-    "          Output from the plugin will be sent to the TCP connection which issued the 'attach' command\n\n"
+            "       attach DEV_LABEL PLUGIN_LABEL PLUGIN_SONAME PLUGIN_ID PLUGIN_OUTPUT [PAR VALUE]*\n"
+            "          Load the specified plugin and attach it to the specified audio device.  Multiple plugins\n"
+            "          can be attached to the same device.  All incoming data is sent to all attached\n"
+            "          plugins, in the same order in which they were attached.\n"
+            "          DEV_LABEL: the label for the input device, which must already have been opened with open\n"
+            "          PLUGIN_LABEL: the label for this plugin instance, for use in subsequent commands.\n"
+            "          This label must not already be the label of a device or another plugin instance.\n"
+            "          PLUGIN_SONAME: the name (without path) of the library containing the plugin\n"
+            "          PLUGIN_ID: the name of the plugin within the library\n"
+            "          PLUGIN_OUTPUT: the name of the desired output from the plugin\n"
+            "                         (some plugins have multiple outputs - you must pick one)\n"
+            "          [PAR VALUE]: an optional set of plugin parameter settings, where:\n"
+            "                       PAR: is the name of a plugin parameter\n"
+            "                       VALUE: is the value to be assiged to the parameter\n\n"
+            "          e.g. attach 3 pulse3 lotek-plugins.so findpulsefdbatch pulses minsnr 6\n\n"
+            "          Output from the plugin will be sent to any TCP connection\n"
+            "          which has issued a corresponding 'receive' or 'receiveAll' command, or\n"
+            "          discarded if no 'receive' connection exists.\n\n"
 
-    "       detach PLUGIN_LABEL\n"
-    "          Stop sending data to the specified plugin instance, and delete it.  Any other\n"
-    "          instances of the same plugin, and any other plugins attached to the same device\n"
-    "          are not affected.\n"
-    "          PLUGIN_LABEL: the label for an attached plugin instance.\n\n"
+            "       detach PLUGIN_LABEL\n"
+            "          Stop sending data to the specified plugin instance, and delete it.  Any other\n"
+            "          instances of the same plugin, and any other plugins attached to the same device\n"
+            "          are not affected.\n"
+            "          PLUGIN_LABEL: the label for an attached plugin instance.\n\n"
 
-    "       rawOn DEV_LABEL\n"
-    "          Raw data from the device DEV_LABEL will be sent to the issuing TCP connection\n"
-    "          once the device is started, independently of any plugin processing.\n\n"
+            "       receive PLUGIN_LABEL\n"
+            "          Start sending any output for the specified plugin to the TCP connection from\n"
+            "          which this command is issued.  This does not affect any existing connections already\n"
+            "          set to receive the output, so multiple connections can receive output from the same\n"
+            "          attached plugin.\n"
+            "          PLUGIN_LABEL: the label for an attached plugin instance.\n"
+            "          Note: this command does not return a reply unless there is an error.\n\n"
+
+            "       receiveAll\n"
+            "          Start sending any output data for all currently attached plugins to the TCP connection from\n"
+            "          which this command is issued.  Also, any plugins attached after this command is issued\n"
+            "          will also send output to the issuing TCP connection, unless a subsequent receiveAll command\n"  
+            "          is issued from a different TCP connection.  This command does not affect any existing\n"
+            "          connections already receiving data from an attached plugin.\n"
+            "          Note: this command does not return a reply unless there is an error.\n\n"
+
+            "       rawOn DEV_LABEL\n"
+            "          Raw data from the device DEV_LABEL will be sent to the issuing TCP connection\n"
+            "          once the device is started, independently of any plugin processing.\n\n"
+            "          Note: this command does not return a reply unless there is an error.\n"
     
-    "       rawOff DEV_LABEL\n"
-    "          Stop sending raw data from the device DEV_LABEL to the issuing TCP connection.\n\n"
+            "       rawOff DEV_LABEL\n"
+            "          Stop sending raw data from the device DEV_LABEL to the issuing TCP connection.\n\n"
+            "          Note: this command does not return a reply unless there is an error.\n"
 
-    "       rawNone DEV_LABEL\n"
-    "          Do not send raw data from the device DEV_LABEL to *any* TCP connections.\n\n"
+            "       rawNone DEV_LABEL\n"
+            "          Do not send raw data from the device DEV_LABEL to *any* TCP connections.\n\n"
+            "          Note: this command does not return a reply unless there is an error.\n"
     
-    "       start DEV_LABEL\n"
-    "          Begin acquiring data from the audio device identified by DEV_LABEL.\n"
-    "          This must already have been created using an 'open' command.\n"
-    "          Data are read from device LABEL, and passed to any attached plugins.\n"
-    "          Output from each plugin instance is sent to the socket from which the\n"
-    "          corresponding 'attach' command was issued.\n\n"
+            "       start DEV_LABEL\n"
+            "          Begin acquiring data from the audio device identified by DEV_LABEL.\n"
+            "          This must already have been created using an 'open' command.\n"
+            "          Data are read from device LABEL, and passed to any attached plugins.\n"
+            "          Output from each plugin instance is sent to the socket from which the\n"
+            "          corresponding 'attach' command was issued.\n\n"
 
-    "       stop DEV_LABEL\n"
-    "          Stop acquiring data from the audio device identified by DEV_LABEL.\n\n"
+            "       stop DEV_LABEL\n"
+            "          Stop acquiring data from the audio device identified by DEV_LABEL.\n\n"
 
-    "Note: start and stop commands can be sent repeatedly for a device which has been opened.\n"
-    "The associated plugin will see a continuous stream of data, albeit with timestamps\n"
-    "reflecting the loss of data between stop and (re)start.  The same applies to startAll and stopAll.\n"
-    "To re-start a plugin completely, you must close the device and re-open it.\n\n"
+            "Note: start and stop commands can be sent repeatedly for a device which has been opened.\n"
+            "The associated plugin will see a continuous stream of data, albeit with timestamps\n"
+            "reflecting the loss of data between stop and (re)start.  The same applies to startAll and stopAll.\n"
+            "To re-start a plugin completely, you must close the device and re-open it.\n\n"
 
-    "       close DEV_LABEL\n"
-    "           Stop acquiring data from the device and shut it down.  This deletes\n"
-    "           the device from the server, so that DEV_LABEL cannot be used in subsequent commands\n"
-    "           until another 'open DEV_LABEL...' command is sent.\n\n"
+            "       close DEV_LABEL\n"
+            "           Stop acquiring data from the device and shut it down.  This deletes\n"
+            "           the device from the server, so that DEV_LABEL cannot be used in subsequent commands\n"
+            "           until another 'open DEV_LABEL...' command is sent.\n\n"
 
-    "       status LABEL\n"
-    "           Report on the status of the audio device identified by LABEL\n"
-    "           The reply is a JSON object.\n\n"
+            "       status LABEL\n"
+            "           Report on the status of the audio device identified by LABEL\n"
+            "           The reply is a JSON object.\n\n"
 
-    "       pstatus LABEL\n"
-    "           Report on the status of plugin identified by LABEL\n"
-    "           The reply is a JSON object.\n\n"
+            "       pstatus LABEL\n"
+            "           Report on the status of plugin identified by LABEL\n"
+            "           The reply is a JSON object.\n\n"
 
-    "       stopAll\n"
-    "           Stop all devices, e.g. to allow changing settings on upstream devices.\n"
+            "       stopAll\n"
+            "           Stop all devices, e.g. to allow changing settings on upstream devices.\n"
         
-    "       startAll\n"
-    "           (Re-)start all devices (e.g. after a stopAll command).\n\n"
+            "       startAll\n"
+            "           (Re-)start all devices (e.g. after a stopAll command).\n\n"
         
-    "       list\n"
-    "           Return the status of all open audio devices and plugins.\n\n"
+            "       list\n"
+            "           Return the status of all open audio devices and plugins.\n\n"
 
-    "       help\n"
-    "           Print this information.\n\n"
+            "       help\n"
+            "           Print this information.\n\n"
 
-    "       quit\n"
-    "           Close all open devices and quit the program.\n";
+            "       quit\n"
+            "           Close all open devices and quit the program.\n";

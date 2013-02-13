@@ -27,6 +27,7 @@ class VampAlsaHost {
 
 protected:
   PollableSet pollables; // map of Pollables, indexed by label, values are shared pointers; this owns its objects
+  string defaultOutputListener; // label of connection which will be automatically added as an outputListener to any new attached plugin 
   std::vector <struct pollfd> pollfds; // in same order as pollables, but some pollables may have 0 or more than 1 FD
   PollableSet deferred_adds;
   PollableSet deferred_removes;

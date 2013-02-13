@@ -113,7 +113,7 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
   return 0;
 };
 
-PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, std::shared_ptr < Pollable > outputConnection, VampAlsaHost *host):
+PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, VampAlsaHost *host):
   Pollable (host, label),
   label(label),
   devLabel(devLabel),
@@ -140,11 +140,29 @@ PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numCha
     delete_privates();
     throw std::runtime_error("Could not load plugin or plugin is not compatible");
   }
-  this->outputConnection = static_pointer_cast < TCPConnection > (outputConnection);
 };
 
 PluginRunner::~PluginRunner() {
   delete_privates();
+};
+
+bool PluginRunner::addOutputListener(string connLabel) {
+  
+  std::shared_ptr < TCPConnection > conn = static_pointer_cast < TCPConnection > (host->lookupByNameShared(connLabel));
+  if (conn) {
+    outputListeners[connLabel] = conn;
+    return true;
+  } else {
+    return false;
+  }
+};
+
+void PluginRunner::removeOutputListener(string connLabel) {
+  outputListeners.erase(connLabel);
+};
+
+void PluginRunner::removeAllOutputListeners() {
+  outputListeners.clear();
 };
 
 void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *src1, int step, long long totalFrames, long long frameOfTimestamp, double frameTimestamp) {
@@ -209,18 +227,21 @@ void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *s
 
 void
 PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
-{
-  auto ptr = outputConnection.lock();
-  if (! ptr) {
-    host->remove(label);
-    return;
-  }
-  
+{  
   totalFeatures += features[outputNo].size();
   for (Plugin::FeatureList::iterator f = features[outputNo].begin(), g = features[outputNo].end(); f != g; ++f ) {
     if (isOutputBinary) {
-      // copy values as raw bytes
-      ptr->queueFloatOutput(f->values);
+      // copy values as raw bytes to any outputListeners
+      for (OutputListenerSet::iterator io = outputListeners.begin(); io != outputListeners.end(); /**/) {
+        if (auto ptr = (io->second).lock()) {
+          ptr->queueFloatOutput(f->values);
+          ++io;
+        } else {
+          OutputListenerSet::iterator to_delete = io++;
+          // host->remove(to_delete->second);
+          outputListeners.erase(to_delete);
+        }
+      }
     } else {
       ostringstream txt;
       txt.setf(ios::fixed,ios::floatfield);
@@ -247,7 +268,18 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
       }
 
       txt << endl;
-      ptr->queueTextOutput(txt.str());
+
+      // send output as text to any outputListeners
+      for (OutputListenerSet::iterator io = outputListeners.begin(); io != outputListeners.end(); /**/) {
+        if (auto ptr = (io->second).lock()) {
+          ptr->queueTextOutput(txt.str());
+          ++io;
+        } else {
+          OutputListenerSet::iterator to_delete = io++;
+          //          host->remove(to_delete->second);
+          outputListeners.erase(to_delete);
+        }
+      }
     }
   }
 };
