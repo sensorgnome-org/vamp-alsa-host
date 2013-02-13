@@ -154,7 +154,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
             nanosleep(&t, 0);
         }
         nanosleep (&t, 0);
-        reply << "{\"message\":\"All devices stopped.\"}";
+        reply << "{\"message\":\"All devices stopped.\"}\n";
         requestPollFDRegen();
     } else if (word == "startAll") {
         struct timespec t;
@@ -165,16 +165,16 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
             // sleep 500 ms between starts
             nanosleep(&t, 0);
         }
-        reply << "{\"message\":\"All devices started.\"}";
+        reply << "{\"message\":\"All devices started.\"}\n";
         requestPollFDRegen();
     } else if (word == "status") {
         string label;
         cmd >> label;
         Pollable *p = lookupByName(label);
         if (p) {
-            reply << p->toJSON();
+          reply << p->toJSON() << '\n';
         } else {
-            reply << "{\"error\": \"Error: '" << label << "' does not specify a known open device\"}";
+            reply << "{\"error\": \"Error: '" << label << "' does not specify a known open device\"}\n";
         }
     } else if (word == "list") {
         reply << "{";
@@ -182,7 +182,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         for (PollableSet::iterator ips = pollables.begin(); ips != pollables.end(); ++ips, --i) {
             reply << "\"" << ips->second->label << "\":" << ips->second->toJSON() << (i > 1 ? "," : "");
         }
-        reply << "}";
+        reply << "}\n";
     } else if (word == "start" || word == "stop") {
         string label;
         cmd >> label;
@@ -193,10 +193,10 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
                 p->stop(realTimeNow);
             else
                 p->start(realTimeNow);
-            reply << p->toJSON();
+            reply << p->toJSON() << '\n';
             requestPollFDRegen();
         } else {
-            reply << "{\"error\": \"Error: '" << label << "' does not specify a known open device\"}";
+            reply << "{\"error\": \"Error: '" << label << "' does not specify a known open device\"}\n";
         }
     } else if (word == "rawOn" || word == "rawOff" || word == "rawNone") {
         string label;
@@ -211,7 +211,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
                 p->removeAllRawListeners();
             }
         } else {
-            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
+            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}\n";
         }
     } else if (word == "open" ) {
         string label, alsaDev;
@@ -220,9 +220,9 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         try {
             std::shared_ptr < AlsaMinder > ptr = std::make_shared < AlsaMinder > (alsaDev, rate, numChan, label, realTimeNow, this);
             add(ptr);
-            reply << ptr->toJSON();
+            reply << ptr->toJSON() << '\n';
         } catch (std::runtime_error e) {
-            reply << "{\"error\": \"Error:" << e.what() << "\"}";
+            reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
         };
     } else if (word == "close") {
         string label;
@@ -230,10 +230,10 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         AlsaMinder *dev = dynamic_cast < AlsaMinder * > (lookupByName(label));
         if (dev) {
             dev->stop(realTimeNow);
-            reply << dev->toJSON();
+            reply << dev->toJSON() << '\n';
             remove(label);
         } else {
-            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}";
+            reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}\n";
         }
         requestPollFDRegen();
     } else if (word == "attach") {
@@ -256,9 +256,9 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
             std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, dev->rate, dev->numChan, pluginLib, pluginName, outputName, ps, lookupByNameShared(connLabel), this);
             pollables[pluginLabel] = static_pointer_cast < Pollable > (plugin);
             dev->addPluginRunner(plugin);
-            reply << plugin->toJSON();
+            reply << plugin->toJSON() << '\n';
         } catch (std::runtime_error e) {
-            reply << "{\"error\": \"Error:" << e.what() << "\"}";
+            reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
         };
     } else if (word == "detach") {
         string pluginLabel;
@@ -268,19 +268,18 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
             if (ip == pollables.end())
                 throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
             pollables.erase(ip);
-            reply << "{\"message\": \"Plugin " << pluginLabel << " has been detached.\"}";
+            reply << "{\"message\": \"Plugin " << pluginLabel << " has been detached.\"}\n";
         } catch (std::runtime_error e) {
-            reply << "{\"error\": \"Error:" << e.what() << "\"}";
+            reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
         };
     } else if (word == "quit" ) {
-        reply << "{\"message\": \"Terminating server.\"}";
+        reply << "{\"message\": \"Terminating server.\"}\n";
         throw std::runtime_error("Quit by client.\n");
     } else if (word == "help" ) {
       reply <<  "Commands:\n" << VampAlsaHost::commandHelp << endl; // NB: we don't use JSON for this
     } else {
-        reply << "{\"error\": \"Error: invalid command\"}";
+        reply << "{\"error\": \"Error: invalid command\"}\n";
     }
-    reply << endl;
     return reply.str();
 };
 
