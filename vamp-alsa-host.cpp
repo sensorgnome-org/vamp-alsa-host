@@ -147,7 +147,7 @@ class AlsaMinder;
 #include "PluginRunner.hpp"
 #include "AlsaMinder.hpp"
 
-static VampAlsaHost host;
+static VampAlsaHost *host;
   
 #define HOST_VERSION "1.4"
 
@@ -188,9 +188,7 @@ void terminate (int p)
     if (terminating)
         return;
     terminating = true;
-    
-    cerr << appname << " terminated with signal or code " << p << endl;
-
+    delete host;
     exit(p);
 }
 
@@ -237,9 +235,10 @@ main(int argc, char **argv)
 
     ostringstream label("Port#", ios_base::app);
     label << serverPortNum;
-    host.add (std::make_shared < TCPListener > (serverPortNum, label.str(), & host));
+    host = new VampAlsaHost();
+    host->add (std::make_shared < TCPListener > (serverPortNum, label.str(), host));
     try {
-        host.run();
+        host->run();
     } catch (std::runtime_error e) {
         cerr << "vamp-alsa-host terminated\nWhy: " << e.what();
     };
