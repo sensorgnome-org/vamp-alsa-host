@@ -6,6 +6,7 @@
 #include <sstream>
 #include <iomanip>
 #include <memory>
+#include <cmath>
 
 using namespace std;
 
@@ -46,8 +47,9 @@ protected:
   bool               stopped;          // is this FCD stopped?  (by which we mean not streaming USB audio)
   int                hasError;         // if non-zero, the most recent error this device got while we polled it? (this would have stopped it)
   int                numFD;            // number of file descriptors required for polling on this device
+  bool               demodFMForRaw;    // if true, any rawListeners receive FM-demodulated samples (reducing stereo to mono)
+  int                demodFMLastTheta; // value of previous phase angle for FM demodulation (in range -32767..32767)
 
-    
 public:
 
   int open();
@@ -72,7 +74,7 @@ public:
   virtual void handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow);
   int start(double timeNow);
   void stop(double timeNow);
-
+  void setDemodFMForRaw(bool demod);
 
 protected:
   

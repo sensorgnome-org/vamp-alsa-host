@@ -117,7 +117,9 @@ AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &
   shouldBeRunning(false),
   stopped(true),
   hasError(0),
-  numFD(0)
+  numFD(0),
+  demodFMForRaw(true),
+  demodFMLastTheta(0)
 {
   if (open()) {
     // there was an error, so throw an exception
@@ -240,6 +242,32 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
       src0 += step * offset;
 
+      char * rawBytes;
+      int numRawBytes;
+      int numRawChan;
+      if (numChan == 2 && demodFMForRaw) {
+        // do FM demodulation - simple but expensive arctan!
+        rawBytes = new char [avail * 2];
+        int16_t * samps = (int16_t *) src0;
+        for (int i=0; i < avail; ++i) {
+          // scaled arctan to get phase angle in -32767..32767
+          int theta = truncf(atan2f(samps[2*i], samps[2*i+1]) * 32767.0 / M_PI);
+          int dtheta = theta - demodFMLastTheta;
+          demodFMLastTheta = theta;
+          if (dtheta > 32767) {
+            dtheta -= 65534;
+          } else if (dtheta < -32767) {
+            dtheta += 65534;
+          }
+          ((int16_t *)rawBytes)[i] = dtheta / 2; // FIXME: native sampling rate / original
+        }
+        numRawBytes = avail * 2;
+        numRawChan = 1;
+      } else {
+        rawBytes = (char *) src0;
+        numRawBytes = avail * numChan * 2;
+        numRawChan = numChan;
+      }
       for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
         // FIXME: big assumptions here:
         // - S16_LE sample format
@@ -247,12 +275,16 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         //   of the first sample on channel 0
 
         if (auto ptr = (ir->second).lock()) {
-          ptr->queueRawOutput((char *) src0, avail * numChan * 2, numChan * 2);
+          ptr->queueRawOutput(rawBytes, numRawBytes, numRawChan * 2);
           ++ir;
         } else {
           RawListenerSet::iterator to_delete = ir++;
           rawListeners.erase(to_delete);
         }
+      }
+      if (rawBytes != (char *) src0) {
+        delete [] rawBytes;
+        rawBytes = 0;
       }
 
       /*
@@ -305,3 +337,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
   }
 };
         
+void
+AlsaMinder::setDemodFMForRaw(bool demod) {
+  demodFMForRaw = demod;
+};
