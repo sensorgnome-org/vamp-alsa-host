@@ -11,6 +11,8 @@ void PluginRunner::delete_privates() {
     }
     delete [] plugbuf;
   }
+  if (partialFrameSum)
+    delete [] partialFrameSum;
 };
 
 int PluginRunner::loadPlugin(ParamSet &ps) {
@@ -113,7 +115,7 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
   return 0;
 };
 
-PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, VampAlsaHost *host):
+PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int hwRate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, VampAlsaHost *host):
   Pollable (host, label),
   label(label),
   devLabel(devLabel),
@@ -123,7 +125,9 @@ PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numCha
   pluginParams(ps),
   host(host),
   rate(rate),
+  hwRate(hwRate),
   numChan(numChan),
+  totalFrames(0),
   totalFeatures(0),
   plugin(0),
   plugbuf(0),
@@ -131,7 +135,12 @@ PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numCha
   blockSize(0),
   stepSize(0),
   framesInPlugBuf(0),
-  isOutputBinary(false)
+  isOutputBinary(false),
+  resampleDecim(hwRate / rate),
+  resampleScale(1.0 / (32768.0 * resampleDecim)),
+  resampleCountdown(resampleDecim),
+  partialFrameSum(new int[numChan]),
+  lastFrametimestamp(0)
 {
 
   // try load the plugin and throw if we fail
@@ -140,6 +149,8 @@ PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int numCha
     delete_privates();
     throw std::runtime_error("Could not load plugin or plugin is not compatible");
   }
+  for (int i=0; i < numChan; ++i)
+    partialFrameSum[i] = 0;
 };
 
 PluginRunner::~PluginRunner() {
@@ -165,64 +176,92 @@ void PluginRunner::removeAllOutputListeners() {
   outputListeners.clear();
 };
 
-void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *src1, int step, long long totalFrames, long long frameOfTimestamp, double frameTimestamp) {
+void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *src1, int step, double frameTimestamp) {
   // alsaHandler has some data for us.  If src1 is NULL, it's only one channel; otherwise it's two channels
 
-  while (avail > 0) {
-    int to_copy = std::min((int) avail, blockSize - framesInPlugBuf);
-    float *pb0, *pb1;
+  int pfs0 = partialFrameSum[0];
+  int pfs1 = partialFrameSum[1];
+  int rc = resampleCountdown;
+  
+  // get timestamp of first (hardware) frame in plugin's buffer
+  frameTimestamp -= (double) framesInPlugBuf / rate + (double) (resampleDecim - rc) / hwRate;
 
+  while (avail > 0) {
+    int hw_frames_to_copy = std::min((int) avail, (blockSize - framesInPlugBuf - 1) * resampleDecim + rc);
+    avail -= hw_frames_to_copy;
+    int decimated_frame_count = (hw_frames_to_copy + (resampleDecim - rc)) / resampleDecim;
+    float *pb0, *pb1;
     pb0 = plugbuf[0] + framesInPlugBuf;
 
     // choose an inner loop, depending on number of channels
     if (src1) {
       // two channels
       pb1 = plugbuf[1] + framesInPlugBuf;
-      for (float *pbe = pb0 + to_copy; pb0 != pbe; /**/ ) {
-        *pb0++ = *src0 / 32768.0;
-        *pb1++ = *src1 / 32768.0;
+      while (hw_frames_to_copy) {
+        pfs0 += *src0;
+        pfs1 += *src1;
         src0 += step;
         src1 += step;
+        --hw_frames_to_copy;
+        --rc;
+        if (rc == 0) {
+          *pb0++ = pfs0 * resampleScale;
+          *pb1++ = pfs1 * resampleScale;
+          pfs0 = pfs1 = 0;
+          rc = resampleDecim;
+        }
       }
     } else {
       // one channel
-      for (float *pbe = pb0 + to_copy; pb0 != pbe; /**/) {
-        *pb0++ = *src0 / 32768.0;
+      while (hw_frames_to_copy) {
+        pfs0 += *src0;
         src0 += step;
+        --hw_frames_to_copy;
+        --rc;
+        if (rc == 0) {
+          *pb0++ = pfs0 * resampleScale;
+          pfs0 = 0;
+          rc = resampleDecim;
+        }
       }
     }
-    framesInPlugBuf += to_copy;
-    avail -= to_copy;
+    framesInPlugBuf += decimated_frame_count;
+    totalFrames += decimated_frame_count;
     if (framesInPlugBuf == blockSize) {
       // time to call the plugin
-
-      RealTime rt = RealTime::fromSeconds( frameTimestamp + (totalFrames - blockSize - frameOfTimestamp) / (double) rate);
+          
+      RealTime rt = RealTime::fromSeconds( frameTimestamp );
       outputFeatures(plugin->process(plugbuf, rt), label);
 
-    // shift samples if we're not advancing by a full
-    // block.
-    // Too bad the VAMP specs don't let the
-    // process() function deal with two segments for each
-    // buffer; then we wouldn't need these wastefull calls
-    // to memmove!  MAYBE FIXME: fake this by changing our own
-    // plugin to have blockSize = stepSize and deal
-    // internally with handling overlap!  Then fix this
-    // code so copying from alsa's mmap segment is done in
-    // one pass for all plugins waiting on a device, then
-    // the mmap segment is marked as available, then
-    // another pass calls process() on all plugins with
-    // full buffers.
+      // shift samples if we're not advancing by a full
+      // block.
+      // Too bad the VAMP specs don't let the
+      // process() function deal with two segments for each
+      // buffer; then we wouldn't need these wastefull calls
+      // to memmove!  MAYBE FIXME: fake this by changing our own
+      // plugin to have blockSize = stepSize and deal
+      // internally with handling overlap!  Then fix this
+      // code so copying from alsa's mmap segment is done in
+      // one pass for all plugins waiting on a device, then
+      // the mmap segment is marked as available, then
+      // another pass calls process() on all plugins with
+      // full buffers.
 
-    if (stepSize < blockSize) {
-      memmove(&plugbuf[0][0], &plugbuf[0][stepSize], (blockSize - stepSize) * sizeof(float));
-      if (src1)
-        memmove(&plugbuf[1][0], &plugbuf[1][stepSize], (blockSize - stepSize) * sizeof(float));
-      framesInPlugBuf = blockSize - stepSize;
-    } else {
-      framesInPlugBuf = 0;
+      if (stepSize < blockSize) {
+        memmove(&plugbuf[0][0], &plugbuf[0][stepSize], (blockSize - stepSize) * sizeof(float));
+        if (src1)
+          memmove(&plugbuf[1][0], &plugbuf[1][stepSize], (blockSize - stepSize) * sizeof(float));
+        framesInPlugBuf = blockSize - stepSize;
+        frameTimestamp += (double) stepSize / rate;
+      } else {
+        framesInPlugBuf = 0;
+        frameTimestamp += (double) blockSize / rate;
+      }
     }
   }
-}
+  partialFrameSum[0] = pfs0;
+  partialFrameSum[1] = pfs1;
+  resampleCountdown = rc;
 };
 
 void
@@ -292,6 +331,7 @@ string PluginRunner::toJSON() {
     << "\"libraryName\":\"" << pluginSOName << "\","
     << "\"pluginID\":\"" << pluginID << "\","
     << "\"pluginOutput\":\"" << pluginOutput << "\","
+    << "\"totalFrames\":" << totalFrames << ","
     << "\"totalFeatures\":" << totalFeatures
     << "}";
   return s.str();

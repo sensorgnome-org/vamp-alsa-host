@@ -28,7 +28,8 @@ public:
 
     
   string             alsaDev;          // ALSA path to fcd device (e.g. hw:CARD=V10)
-  int                rate;             // sampling rate to use for device
+  int                rate;             // sampling rate to supply plugins with
+  unsigned int       hwRate;           // sampling rate of hardware device
   unsigned int       numChan;          // number of channels to read from device
 
 protected:

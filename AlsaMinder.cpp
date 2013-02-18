@@ -22,13 +22,17 @@ int AlsaMinder::open() {
         
   snd_pcm_access_mask_none( mask);
   snd_pcm_access_mask_set( mask, SND_PCM_ACCESS_MMAP_INTERLEAVED);
-    
+
+  int rateDir = 1;
+
   if ((snd_pcm_open(& pcm, alsaDev.c_str(), SND_PCM_STREAM_CAPTURE, 0))
       || snd_pcm_hw_params_any(pcm, params)
       || snd_pcm_hw_params_set_access_mask(pcm, params, mask)
       || snd_pcm_hw_params_set_format(pcm, params, SND_PCM_FORMAT_S16_LE)
       || snd_pcm_hw_params_set_channels(pcm, params, numChan)
-      || snd_pcm_hw_params_set_rate(pcm, params, rate, 0)
+      || snd_pcm_hw_params_set_rate_resample(pcm, params, 0)
+      || snd_pcm_hw_params_set_rate_last(pcm, params, & hwRate, & rateDir)
+      || hwRate / rate * rate != hwRate // we only do exact r
       || snd_pcm_hw_params_set_period_size_near(pcm, params, & period_frames, 0) < 0
       || snd_pcm_hw_params_set_buffer_size_near(pcm, params, & buffer_frames) < 0
       || snd_pcm_hw_params(pcm, params)
@@ -118,7 +122,7 @@ AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &
   stopped(true),
   hasError(0),
   numFD(0),
-  demodFMForRaw(true),
+  demodFMForRaw(false),
   demodFMLastTheta(0)
 {
   if (open()) {
@@ -143,6 +147,7 @@ string AlsaMinder::toJSON() {
     << "\"type\":\"AlsaMinder\","
     << "\"device\":\"" << alsaDev << "\","
     << "\"rate\":" << rate << ","
+    << "\"hwRate\":" << hwRate << ","
     << "\"numChan\":" << numChan << ","
     << setprecision(14)
     << "\"startTimestamp\":" << startTimestamp << ","
@@ -209,15 +214,13 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
     } else if (avail > 0) {
       lastDataReceived = timeNow;
 
-      long long frameOfTimestamp;
       double frameTimestamp;
 
       // get most recent period timestamp from ALSA
       snd_htimestamp_t ts;
       snd_pcm_uframes_t av;
       snd_pcm_htimestamp(pcm, &av, &ts);
-      frameTimestamp = ts.tv_sec + (double) ts.tv_nsec / 1.0e9;
-      frameOfTimestamp = totalFrames + av;
+      frameTimestamp = ts.tv_sec + (double) ts.tv_nsec / 1.0e9 - (double) av / hwRate;
 
       // begin direct access to ALSA mmap buffers for the device
       const snd_pcm_channel_area_t *areas;
@@ -245,21 +248,22 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       char * rawBytes;
       int numRawBytes;
       int numRawChan;
-      if (numChan == 2 && demodFMForRaw) {
+      int rateFact = hwRate / 1000;
+      if (numChan == 2 && demodFMForRaw && rawListeners.size() > 0) {
         // do FM demodulation - simple but expensive arctan!
         rawBytes = new char [avail * 2];
         int16_t * samps = (int16_t *) src0;
         for (int i=0; i < avail; ++i) {
           // scaled arctan to get phase angle in -32767..32767
-          int theta = truncf(atan2f(samps[2*i], samps[2*i+1]) * 32767.0 / M_PI);
+          int theta = truncf(atan2f(samps[2*i], samps[2*i+1]) * 32768.0 / M_PI);
           int dtheta = theta - demodFMLastTheta;
           demodFMLastTheta = theta;
           if (dtheta > 32767) {
-            dtheta -= 65534;
-          } else if (dtheta < -32767) {
-            dtheta += 65534;
+            dtheta -= 65536;
+          } else if (dtheta < -32768) {
+            dtheta += 65536;
           }
-          ((int16_t *)rawBytes)[i] = dtheta / 2; // FIXME: native sampling rate / original
+          ((int16_t *)rawBytes)[i] = dtheta * rateFact / 75; // FIXME: native sampling rate / original
         }
         numRawBytes = avail * 2;
         numRawChan = 1;
@@ -304,8 +308,9 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
           src1 = (int16_t *) (((unsigned char *) areas[1].addr) + areas[1].first / 8);
           src1 += step * offset;
         }
+
         if (auto ptr = (ip->second).lock()) {
-          ptr->handleData(avail, src0, src1, step, totalFrames, frameOfTimestamp, frameTimestamp);
+          ptr->handleData(avail, src0, src1, step, frameTimestamp);
           ++ip;
         } else {
           PluginRunnerSet::iterator to_delete = ip++;

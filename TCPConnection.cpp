@@ -67,21 +67,24 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
     }
     cmdString[len] = '\0';
     inputBuff += string(cmdString); // might be as long as 2 * MAX_CMD_STRING_LENGTH
-    // look for a '\n'
-    unsigned pos = inputBuff.find('\n');
-    if (pos == inputBuff.npos) {
-      // none found; prevent input buffer from growing too big
-      if (inputBuff.npos > MAX_CMD_STRING_LENGTH)
-        inputBuff.erase(0, inputBuff.npos - MAX_CMD_STRING_LENGTH);
-      return;
+    // handle as many '\n'-terminated command lines as we can find
+    for (;;) {
+      unsigned pos = inputBuff.find('\n');
+      if (pos == inputBuff.npos) {
+        // none found; prevent input buffer from growing too big
+        if (inputBuff.npos > MAX_CMD_STRING_LENGTH)
+          inputBuff.erase(0, inputBuff.npos - MAX_CMD_STRING_LENGTH);
+        return;
+      }
+      
+      // grab the full command
+      string cmd(inputBuff.substr(0, pos));
+      // drop it from the input buffer; note that since the newline is in the
+      // last MAX_CMD_STRING_LENGTH characters of inputBuff, removing the command
+      // will keep that buffer's length <= MAX_CMD_STRING_LENGTH
+      inputBuff.erase(0, pos + 1);
+      queueTextOutput(host->runCommand(cmd, label)); // call the toplevel
     }
-    // grab the full command
-    string cmd(inputBuff.substr(0, pos));
-    // drop it from the input buffer; note that since the newline is in the
-    // last MAX_CMD_STRING_LENGTH characters of inputBuff, removing the command
-    // will keep that buffer's length <= MAX_CMD_STRING_LENGTH
-    inputBuff.erase(0, pos + 1);
-    queueTextOutput(host->runCommand(cmd, label)); // call the toplevel
   }
 
   if (pollfds->revents & (POLLOUT)) {

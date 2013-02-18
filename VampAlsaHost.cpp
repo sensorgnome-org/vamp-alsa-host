@@ -213,6 +213,15 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         } else {
             reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}\n";
         }
+    } else if (word == "fmOn" || word == "fmOff") {
+        string label;
+        cmd >> label;
+        AlsaMinder *p = dynamic_cast < AlsaMinder * > (lookupByName(label));
+        if (p) {
+          p->setDemodFMForRaw(word == "fmOn");
+        } else {
+          reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}\n";
+        }
     } else if (word == "open" ) {
         string label, alsaDev;
         int rate, numChan;
@@ -253,7 +262,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
               throw std::runtime_error(string("There is no device with label '") + devLabel + "'");
             if (lookupByName(pluginLabel))
               throw std::runtime_error(string("There is already a device or plugin with label '") + pluginLabel + "'");
-            std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, dev->rate, dev->numChan, pluginLib, pluginName, outputName, ps, this);
+            std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, dev->rate, dev->hwRate, dev->numChan, pluginLib, pluginName, outputName, ps, this);
             pollables[pluginLabel] = static_pointer_cast < Pollable > (plugin);
             dev->addPluginRunner(plugin);
             if (! plugin->addOutputListener(defaultOutputListener))
@@ -392,9 +401,19 @@ VampAlsaHost::commandHelp =
             "          Note: this command does not return a reply unless there is an error.\n"
 
             "       rawNone DEV_LABEL\n"
-            "          Do not send raw data from the device DEV_LABEL to *any* TCP connections.\n\n"
-            "          Note: this command does not return a reply unless there is an error.\n"
+            "          Do not send raw data from the device DEV_LABEL to *any* TCP connections.\n"
+            "          Note: this command does not return a reply unless there is an error.\n\n"
     
+            "       fmOn DEV_LABEL\n"
+            "          Raw data from the device DEV_LABEL will be FM-demodulated before being sent to to any\n"
+            "          TCP connections listening to it.  This does not change the data seen by plugins\n"
+            "          once the device is started, independently of any plugin processing.\n"
+            "          Note: this command does not return a reply unless there is an error.\n\n"
+    
+            "       fmOff DEV_LABEL\n"
+            "          Turn off FM-demodulation for the specified device;  raw data will be sent to TCP connections as-is.\n"
+            "          Note: this command does not return a reply unless there is an error.\n\n"
+
             "       start DEV_LABEL\n"
             "          Begin acquiring data from the audio device identified by DEV_LABEL.\n"
             "          This must already have been created using an 'open' command.\n"

@@ -30,12 +30,14 @@ public:
   string             pluginID;         // id of plugin
   string             pluginOutput;     // name of output to obtain from plugin
   ParamSet           pluginParams;     // parameter settings for plugin
-
+  static const int   MAX_NUM_CHAN = 16;// maximum number of channels a plugin can handle
 protected:
   static PluginLoader *pluginLoader;   // plugin loader (singleton)
   VampAlsaHost *     host;             // host
-  int                rate;             // sampling rate; frames per second
+  int                rate;             // sampling rate for plugin; frames per second
+  int                hwRate;           // sampling rate of hardware to which we're attached
   unsigned int       numChan;          // number of channels plugin uses
+  long long          totalFrames;      // total number of (decimated) frames this plugin instance has processed
   long long          totalFeatures;    // total number of "features" (e.g. lotek pulses) seen on this FCD
   Plugin *           plugin;           // VAMP plugin we'll be running on this fcd
   float **           plugbuf;          // pointer to one buffer for each channel (left, right) of float data for plugin
@@ -44,6 +46,12 @@ protected:
   int                stepSize;         // amount (in frames) by which consecutive blocks differ
   int                framesInPlugBuf;  // number of frames in plugin buffers since last call to plugin->process()
   bool               isOutputBinary;   // if true, output from plugin is not text.  For text outputs, if
+  int                resampleDecim;    // the number of incoming hardware frames to combine into a frame for the plugin
+  float              resampleScale;    // scale factor for a sum of hardware samples
+  int                resampleCountdown; // number of hardware frames left to get before we have a resampled frame
+  int *              partialFrameSum;  // partial frame sums from previous call to handleData
+  double             lastFrametimestamp; // frame timestamp from prvious call to handleData
+
   // the output buffer gets filled before it can be written to a socket,
   // the oldest output is discarded line by line, so that any output line
   // is either completely written or not written at all.  For binary output,
@@ -52,7 +60,7 @@ protected:
   OutputListenerSet     outputListeners;     // connections receiving output from this plugin, if any.
 
 public:
-  PluginRunner(string &label, string &devLabel, int rate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, VampAlsaHost *host);
+  PluginRunner(string &label, string &devLabel, int rate, int hwRate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, VampAlsaHost *host);
   ~PluginRunner();
 
   bool addOutputListener(string connLabel);
@@ -60,7 +68,7 @@ public:
   void removeAllOutputListeners();
 
   int loadPlugin(ParamSet &ps);
-  void handleData(long avail, int16_t *src0, int16_t *src1, int step, long long totalFrames, long long frameOfTimestamp, double frameTimestamp);
+  void handleData(long avail, int16_t *src0, int16_t *src1, int step, double frameTimestamp);
   void outputFeatures(Plugin::FeatureSet features, string prefix);
   string toJSON();
 
