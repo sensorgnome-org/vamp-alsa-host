@@ -70,7 +70,7 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
     inputBuff += string(cmdString); // might be as long as 2 * MAX_CMD_STRING_LENGTH
     // handle as many '\n'-terminated command lines as we can find
     for (;;) {
-      unsigned pos = inputBuff.find('\n');
+      size_t pos = inputBuff.find('\n');
       if (pos == inputBuff.npos) {
         // none found; prevent input buffer from growing too big
         if (inputBuff.npos > MAX_CMD_STRING_LENGTH)
