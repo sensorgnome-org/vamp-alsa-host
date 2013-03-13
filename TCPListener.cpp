@@ -17,16 +17,17 @@ void TCPListener::handleEvents (struct pollfd *pollfds, bool timedOut, double ti
     if (conn_fd >= 0) {
       ostringstream label("TCPFD#", std::ios_base::app);
       label << conn_fd;
-      auto conn = std::make_shared < TCPConnection > (conn_fd, host, label.str());
+      auto conn = std::make_shared < TCPConnection > (conn_fd, host, label.str(), quiet);
       host->add(conn);
     }
   }
 };
 
-TCPListener::TCPListener(int server_port_num, string label, VampAlsaHost *host) : 
+TCPListener::TCPListener(int server_port_num, string label, VampAlsaHost *host, bool quiet) : 
   Pollable(host, label),
   SO_REUSEADDR_ON(1),
-  server_port_num(server_port_num)
+  server_port_num(server_port_num),
+  quiet(quiet)
 {
     
   pollfd.fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);

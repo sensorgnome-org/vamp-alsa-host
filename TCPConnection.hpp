@@ -35,7 +35,7 @@ protected:
 
 public:
 
-  TCPConnection (int fd, VampAlsaHost *minder, string label);
+  TCPConnection (int fd, VampAlsaHost *minder, string label, bool quiet);
   
   int getNumPollFDs() { return 1;};
 

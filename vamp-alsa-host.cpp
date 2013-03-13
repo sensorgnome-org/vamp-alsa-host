@@ -172,10 +172,12 @@ usage(string name) {
         "which is licensed under GNU GPL V2.0\n"
          << name << " is freely redistributable under GNU GPL V2.0 or later\n\n"
 
-        "Usage:\n" << name << " [-p PORTNO]&\n"
+        "Usage:\n" << name << " [-q] [-p PORTNO]&\n"
         "    -- Runs a server which listens and replies to commands via TCP/IP on port PORTNO\n"
         "       PORTNO defaults to " << serverPortNum << endl << 
         "       Reply text is terminated by an empty line.\n\n"
+
+        "    Specifying '-q' tells the server not to print the welcome message to clients.\n\n"
 
         "    The server accepts the following commands on its TCP/IP port:\n\n"
          << VampAlsaHost::commandHelp;
@@ -197,18 +199,22 @@ main(int argc, char **argv)
 {
     enum {
         COMMAND_HELP = 'h',
-        COMMAND_PORT_NUM = 'p'
+        COMMAND_PORT_NUM = 'p',
+        COMMAND_QUIET = 'q'
+
     };
 
     int option_index;
-    static const char short_options[] = "hp:";
+    static const char short_options[] = "hp:q";
     static const struct option long_options[] = {
         {"help", 0, 0, COMMAND_HELP},
         {"port", 1, 0, COMMAND_PORT_NUM},
+        {"quiet", 0, 0, COMMAND_QUIET},
         {0, 0, 0, 0}
     };
 
     int c;
+    bool quiet = false;
 
     while ((c = getopt_long(argc, argv, short_options, long_options, &option_index)) != -1) {
         switch (c) {
@@ -217,6 +223,9 @@ main(int argc, char **argv)
             exit(0);
         case COMMAND_PORT_NUM:
             serverPortNum = atoi(optarg);
+            break;
+        case COMMAND_QUIET:
+            quiet = true;
             break;
         default:
             usage(appname);
@@ -236,7 +245,7 @@ main(int argc, char **argv)
     ostringstream label("Port#", ios_base::app);
     label << serverPortNum;
     host = new VampAlsaHost();
-    host->add (std::make_shared < TCPListener > (serverPortNum, label.str(), host));
+    host->add (std::make_shared < TCPListener > (serverPortNum, label.str(), host, quiet));
     try {
         host->run();
     } catch (std::runtime_error e) {

@@ -18,6 +18,7 @@ class TCPListener : public Pollable {
   struct sockaddr_in serv_addr;
   int SO_REUSEADDR_ON;
   int server_port_num;
+  bool quiet;
 
  public:
 
@@ -27,7 +28,7 @@ class TCPListener : public Pollable {
 
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
-  TCPListener(int server_port_num, string label, VampAlsaHost *host);
+  TCPListener(int server_port_num, string label, VampAlsaHost *host, bool quiet);
 
   void stop(double timeNow);
 

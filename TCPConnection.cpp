@@ -1,6 +1,6 @@
 #include "TCPConnection.hpp"
 
-TCPConnection::TCPConnection (int fd, VampAlsaHost * host, string label) : 
+TCPConnection::TCPConnection (int fd, VampAlsaHost * host, string label, bool quiet) : 
   Pollable(host, label),
   outputLineBuffer(MAX_OUTPUT_LINE_BUFFER_SIZE),
   outputFloatBuffer(MAX_OUTPUT_FLOAT_BUFFER_SIZE),
@@ -8,13 +8,14 @@ TCPConnection::TCPConnection (int fd, VampAlsaHost * host, string label) :
 {
   pollfd.fd = fd;
   pollfd.events = POLLIN | POLLRDHUP;
-  queueTextOutput("{"
-                  "\"message\":\"Welcome to vamp_alsa_host.  Type 'help' for help.\","
-                  "\"version\":\"1.0.0\","
-                  "\"author\":\"Copyright (C) 2012-2013 John Brzustowski\","
-                  "\"maintainer\":\"jbrzusto@fastmail.fm\","
-                  "\"licence\":\"GNU GPL version 2.0 or later\""
-                  "}\n");
+  if (! quiet)
+    queueTextOutput("{"
+                    "\"message\":\"Welcome to vamp_alsa_host.  Type 'help' for help.\","
+                    "\"version\":\"1.0.0\","
+                    "\"author\":\"Copyright (C) 2012-2013 John Brzustowski\","
+                    "\"maintainer\":\"jbrzusto@fastmail.fm\","
+                    "\"licence\":\"GNU GPL version 2.0 or later\""
+                    "}\n");
 };
   
 int TCPConnection::getPollFDs (struct pollfd * pollfds) {
