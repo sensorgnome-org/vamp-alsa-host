@@ -2,7 +2,8 @@
 #define TCPLISTENER_HPP
 
 #include <sys/socket.h>
-#include <netinet/in.h>
+#include <sys/un.h>
+//#include <netinet/in.h>
 #include <string.h>
 #include <iostream>
 #include <sstream>
@@ -15,9 +16,8 @@ class TCPListener : public Pollable {
 
  protected:
   struct pollfd pollfd;
-  struct sockaddr_in serv_addr;
-  int SO_REUSEADDR_ON;
-  int server_port_num;
+  struct sockaddr_un serv_addr;
+  string server_socket_name;
   bool quiet;
 
  public:
@@ -28,7 +28,7 @@ class TCPListener : public Pollable {
 
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
-  TCPListener(int server_port_num, string label, VampAlsaHost *host, bool quiet);
+  TCPListener(string server_socket_name, string label, VampAlsaHost *host, bool quiet);
 
   void stop(double timeNow);
 

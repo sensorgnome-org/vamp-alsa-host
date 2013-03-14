@@ -151,7 +151,7 @@ static VampAlsaHost *host;
   
 #define HOST_VERSION "1.4"
 
-static int serverPortNum = 0xbd09;            // port on which we listen for TCP connections
+static string serverSocketName = "/tmp/VAH.sock";            // port on which we listen for connections
 
 static const string appname="vamp-alsa-host";
 
@@ -172,14 +172,15 @@ usage(string name) {
         "which is licensed under GNU GPL V2.0\n"
          << name << " is freely redistributable under GNU GPL V2.0 or later\n\n"
 
-        "Usage:\n" << name << " [-q] [-p PORTNO]&\n"
-        "    -- Runs a server which listens and replies to commands via TCP/IP on port PORTNO\n"
-        "       PORTNO defaults to " << serverPortNum << endl << 
+        "Usage:\n" << name << " [-q] [-s SOCKNAME] &\n"
+        "    -- Runs a server which listens and replies to commands via\n"
+        "       unix domain socket SOCKNAME, which is created in /tmp\n"
+        "       SOCKNAME defaults to " << serverSocketName << endl << 
         "       Reply text is terminated by an empty line.\n\n"
 
         "    Specifying '-q' tells the server not to print the welcome message to clients.\n\n"
 
-        "    The server accepts the following commands on its TCP/IP port:\n\n"
+        "    The server accepts the following commands on SOCKNAME:\n\n"
          << VampAlsaHost::commandHelp;
 }
 
@@ -199,16 +200,16 @@ main(int argc, char **argv)
 {
     enum {
         COMMAND_HELP = 'h',
-        COMMAND_PORT_NUM = 'p',
+        COMMAND_SOCKET_NAME = 's',
         COMMAND_QUIET = 'q'
 
     };
 
     int option_index;
-    static const char short_options[] = "hp:q";
+    static const char short_options[] = "hs:q";
     static const struct option long_options[] = {
         {"help", 0, 0, COMMAND_HELP},
-        {"port", 1, 0, COMMAND_PORT_NUM},
+        {"socket", 1, 0, COMMAND_SOCKET_NAME},
         {"quiet", 0, 0, COMMAND_QUIET},
         {0, 0, 0, 0}
     };
@@ -221,8 +222,15 @@ main(int argc, char **argv)
         case COMMAND_HELP:
             usage(appname);
             exit(0);
-        case COMMAND_PORT_NUM:
-            serverPortNum = atoi(optarg);
+        case COMMAND_SOCKET_NAME:
+            {
+                serverSocketName = string(optarg);
+                if (serverSocketName.find('/') != string::npos) {
+                    std::cerr << "error: socket name must not contain '/': it is always created in /tmp\n";
+                    exit(2);
+                }
+                serverSocketName = string("/tmp/") + optarg;
+            }
             break;
         case COMMAND_QUIET:
             quiet = true;
@@ -233,6 +241,23 @@ main(int argc, char **argv)
         }
     }
 
+    // remove existing socket from filespace, with safeguards
+
+    struct stat sock_info;
+    bool okay = true;
+    if (stat(serverSocketName.c_str(), & sock_info)) {
+        if (errno != ENOENT)
+            okay = false;
+    } else {
+        if ( ! S_ISSOCK(sock_info.st_mode))
+            okay = false;
+    }
+    if (!okay) {
+        std::cerr << "error: '" << serverSocketName << "' exists and has wrong permissions or is not a socket\n";
+        exit(3);
+    };
+    unlink(serverSocketName.c_str());
+
     // handle signals gracefully
 
     signal(SIGTERM, terminate);
@@ -242,10 +267,10 @@ main(int argc, char **argv)
     signal(SIGFPE, terminate);
     signal(SIGABRT, terminate);
 
-    ostringstream label("Port#", ios_base::app);
-    label << serverPortNum;
+    ostringstream label("Socket:", ios_base::app);
+    label << serverSocketName;
     host = new VampAlsaHost();
-    host->add (std::make_shared < TCPListener > (serverPortNum, label.str(), host, quiet));
+    host->add (std::make_shared < TCPListener > (serverSocketName, label.str(), host, quiet));
     try {
         host->run();
     } catch (std::runtime_error e) {
