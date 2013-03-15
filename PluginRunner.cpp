@@ -15,7 +15,7 @@ void PluginRunner::delete_privates() {
     delete [] partialFrameSum;
 };
 
-int PluginRunner::loadPlugin(ParamSet &ps) {
+int PluginRunner::loadPlugin() {
   // load the plugin, make sure it is compatible and that all parameters are okay.
 
   // get an instance of the plugin loader, 
@@ -76,8 +76,7 @@ int PluginRunner::loadPlugin(ParamSet &ps) {
 
   // set the plugin's parameters
 
-  for (ParamSetIter it = ps.begin(); it != ps.end(); ++it)
-    plugin->setParameter(it->first, it->second);
+  setParameters(pluginParams);
 
   // initialise the plugin
 
@@ -145,7 +144,7 @@ PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int hwRate
 
   // try load the plugin and throw if we fail
 
-  if (loadPlugin(ps)) {
+  if (loadPlugin()) {
     delete_privates();
     throw std::runtime_error("Could not load plugin or plugin is not compatible");
   }
@@ -354,6 +353,13 @@ int
 PluginRunner::start(double timeNow) {
   /* do nothing */
   return 0;
+};
+
+void
+PluginRunner::setParameters(ParamSet &ps) {
+  if (plugin)
+    for (ParamSetIter it = ps.begin(); it != ps.end(); ++it)
+      plugin->setParameter(it->first, it->second);
 };
 
 int

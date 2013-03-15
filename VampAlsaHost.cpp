@@ -273,6 +273,28 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         } catch (std::runtime_error e) {
             reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
         };
+    } else if (word == "param") {
+        string pluginLabel;
+        ParamSet ps;
+        string par;
+        float val;
+        cmd >> pluginLabel;
+        for (;;) {
+            if (! (cmd >> par >> val))
+                break;
+            ps[par] = val;
+        }
+        try {
+            PollableSet::iterator ip = pollables.find(pluginLabel);
+            if (ip == pollables.end())
+                throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
+            std::shared_ptr < PluginRunner > p = dynamic_pointer_cast < PluginRunner > (ip->second);
+            auto ptr = p.get();
+            if (ptr)
+              p->setParameters(ps);
+        } catch (std::runtime_error e) {
+            reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
+        };
     } else if (word == "detach") {
         string pluginLabel;
         cmd >> pluginLabel;
@@ -369,11 +391,18 @@ VampAlsaHost::commandHelp =
             "          which has issued a corresponding 'receive' or 'receiveAll' command, or\n"
             "          discarded if no 'receive' connection exists.\n\n"
 
+            "       param PLUGIN_LABEL [PAR VALUE]*\n"
+            "          set the value(s) of specified parameter(s) of given attached plugin instance.\n"
+            "          PLUGIN_LABEL: label of an attached plugin instance.\n\n"
+            "          PAR: the name of a plugin parameter\n"
+            "          VALUE: the value to assign to the parameter\n\n"
+            "          e.g. setpar pulse3 minsnr 3\n\n"
+
             "       detach PLUGIN_LABEL\n"
             "          Stop sending data to the specified plugin instance, and delete it.  Any other\n"
             "          instances of the same plugin, and any other plugins attached to the same device\n"
             "          are not affected.\n"
-            "          PLUGIN_LABEL: the label for an attached plugin instance.\n\n"
+            "          PLUGIN_LABEL: the label of an attached plugin instance.\n\n"
 
             "       receive PLUGIN_LABEL\n"
             "          Start sending any output for the specified plugin to the TCP connection from\n"

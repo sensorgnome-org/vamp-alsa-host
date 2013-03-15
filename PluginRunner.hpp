@@ -67,7 +67,7 @@ public:
   void removeOutputListener(string connLabel);
   void removeAllOutputListeners();
 
-  int loadPlugin(ParamSet &ps);
+  int loadPlugin();
   void handleData(long avail, int16_t *src0, int16_t *src1, int step, double frameTimestamp);
   void outputFeatures(Plugin::FeatureSet features, string prefix);
   string toJSON();
@@ -82,6 +82,7 @@ public:
 
   int start(double timeNow);
 
+  void setParameters(ParamSet &ps);
 
 private:
   void delete_privates();
