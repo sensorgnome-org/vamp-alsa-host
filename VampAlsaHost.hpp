@@ -49,7 +49,7 @@ public:
   void poll(int timeout);
   string runCommand(string cmdString, string connLabel);
   void run();
-  double now(bool is_monotonic = true);
+  double now(bool is_monotonic = false);
   static const string commandHelp;
 
 protected:

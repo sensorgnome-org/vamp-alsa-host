@@ -90,11 +90,12 @@ void AlsaMinder::removePluginRunner(std::shared_ptr < PluginRunner > pr) {
   plugins.erase(pr.get());
 };
 
-void AlsaMinder::addRawListener(string connLabel) {
+void AlsaMinder::addRawListener(string connLabel, unsigned long long framesBetweenTimestamps) {
   
   std::shared_ptr < TCPConnection > conn = static_pointer_cast < TCPConnection > (host->lookupByNameShared(connLabel));
-  if (conn)
-    rawListeners[connLabel] = conn;
+  if (conn) {
+    rawListeners[connLabel] = {conn, framesBetweenTimestamps, 0};
+  }
 };
 
 void AlsaMinder::removeRawListener(string connLabel) {
@@ -246,7 +247,6 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       src0 += step * offset;
 
       char * rawBytes;
-      int numRawBytes;
       int numRawChan;
       int rateFact = hwRate / 1000;
       if (numChan == 2 && demodFMForRaw && rawListeners.size() > 0) {
@@ -265,11 +265,9 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
           }
           ((int16_t *)rawBytes)[i] = dtheta * rateFact / 75; // FIXME: native sampling rate / original
         }
-        numRawBytes = avail * 2;
         numRawChan = 1;
       } else {
         rawBytes = (char *) src0;
-        numRawBytes = avail * numChan * 2;
         numRawChan = numChan;
       }
       for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
@@ -278,8 +276,24 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         // - samples occupy a contiguous area of memory, starting at the first byte
         //   of the first sample on channel 0
 
-        if (auto ptr = (ir->second).lock()) {
-          ptr->queueRawOutput(rawBytes, numRawBytes, numRawChan * 2);
+        if (auto ptr = (ir->second.con).lock()) {
+          // if we're emitting timestamps between frames, see whether
+          // we'll need to do that before the end of this batch
+          
+          if (ir->second.framesBetweenTimestamps > 0) {
+            long long after_timestamp = avail - ir->second.frameCountDown;
+            ptr->queueRawOutput(rawBytes, std::min(ir->second.frameCountDown, (unsigned long long) avail) * numRawChan * 2, numRawChan * 2);
+            if (after_timestamp >= 0) {
+              ptr->queueRawOutput((char *) &frameTimestamp, sizeof(frameTimestamp), sizeof(frameTimestamp));
+              if (after_timestamp > 0)
+                ptr->queueRawOutput(rawBytes, after_timestamp * numRawChan * 2, numRawChan * 2);
+              ir->second.frameCountDown = ir->second.framesBetweenTimestamps - after_timestamp;
+            } else {
+              ir->second.frameCountDown -= avail;
+            }
+          } else {
+            ptr->queueRawOutput(rawBytes, avail * numRawChan * 2, numRawChan * 2);
+          }
           ++ir;
         } else {
           RawListenerSet::iterator to_delete = ir++;

@@ -16,7 +16,13 @@ using namespace std;
 #include "PluginRunner.hpp"
 #include "TCPConnection.hpp"
 
-typedef std::map < string, std::weak_ptr < TCPConnection > > RawListenerSet;
+typedef struct {
+  std::weak_ptr < TCPConnection > con;
+  unsigned long long framesBetweenTimestamps;
+  unsigned long long frameCountDown;
+} rawListener;
+
+typedef std::map < string, rawListener > RawListenerSet;
 typedef std::map < PluginRunner *, std::weak_ptr < PluginRunner > > PluginRunnerSet;
 
 class AlsaMinder : public Pollable {
@@ -56,7 +62,7 @@ public:
   int open();
   void addPluginRunner(std::shared_ptr < PluginRunner > pr);
   void removePluginRunner(std::shared_ptr < PluginRunner > pr);
-  void addRawListener(string connLabel);
+  void addRawListener(string connLabel, unsigned long long framesBetweenTimestamps);
   void removeRawListener(string connLabel);
   void removeAllRawListeners();
 
