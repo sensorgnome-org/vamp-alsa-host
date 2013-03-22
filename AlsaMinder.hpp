@@ -55,7 +55,7 @@ protected:
   int                hasError;         // if non-zero, the most recent error this device got while we polled it? (this would have stopped it)
   int                numFD;            // number of file descriptors required for polling on this device
   bool               demodFMForRaw;    // if true, any rawListeners receive FM-demodulated samples (reducing stereo to mono)
-  int                demodFMLastTheta; // value of previous phase angle for FM demodulation (in range -32767..32767)
+  float              demodFMLastTheta; // value of previous phase angle for FM demodulation (in range -pi..pi)
 
 public:
 

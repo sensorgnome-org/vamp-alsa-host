@@ -6,6 +6,11 @@ void AlsaMinder::delete_privates() {
     snd_pcm_close(pcm);
     pcm = 0;
   }
+  for (PluginRunnerSet::iterator ip = plugins.begin(); ip != plugins.end(); /**/) {
+    host->remove(ip->second);
+    PluginRunnerSet::iterator del = ip++;
+    plugins.erase(del);
+  }
 };
     
 int AlsaMinder::open() {
@@ -32,7 +37,7 @@ int AlsaMinder::open() {
       || snd_pcm_hw_params_set_channels(pcm, params, numChan)
       || snd_pcm_hw_params_set_rate_resample(pcm, params, 0)
       || snd_pcm_hw_params_set_rate_last(pcm, params, & hwRate, & rateDir)
-      || hwRate / rate * rate != hwRate // we only do exact r
+      || hwRate % rate != 0 // we only do exact rate decimation
       || snd_pcm_hw_params_set_period_size_near(pcm, params, & period_frames, 0) < 0
       || snd_pcm_hw_params_set_buffer_size_near(pcm, params, & buffer_frames) < 0
       || snd_pcm_hw_params(pcm, params)
@@ -248,22 +253,22 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
 
       char * rawBytes;
       int numRawChan;
-      int rateFact = hwRate / 1000;
       if (numChan == 2 && demodFMForRaw && rawListeners.size() > 0) {
-        // do FM demodulation - simple but expensive arctan!
+        // do FM demodulation with simple but expensive arctan!
+        float dthetaScale = hwRate / (2 * M_PI) / 75000.0 * 32767.0;
         rawBytes = new char [avail * 2];
         int16_t * samps = (int16_t *) src0;
         for (int i=0; i < avail; ++i) {
-          // scaled arctan to get phase angle in -32767..32767
-          int theta = truncf(atan2f(samps[2*i], samps[2*i+1]) * 32768.0 / M_PI);
-          int dtheta = theta - demodFMLastTheta;
+          // get phase angle in -pi..pi
+          float theta = atan2f(samps[2*i], samps[2*i+1]);
+          float dtheta = theta - demodFMLastTheta;
           demodFMLastTheta = theta;
-          if (dtheta > 32767) {
-            dtheta -= 65536;
-          } else if (dtheta < -32768) {
-            dtheta += 65536;
+          if (dtheta > M_PI) {
+            dtheta -= 2 * M_PI;
+          } else if (dtheta < -M_PI) {
+            dtheta += 2 * M_PI;
           }
-          ((int16_t *)rawBytes)[i] = dtheta * rateFact / 75; // FIXME: native sampling rate / original
+          ((int16_t *)rawBytes)[i] = roundf(dthetaScale * dtheta);
         }
         numRawChan = 1;
       } else {

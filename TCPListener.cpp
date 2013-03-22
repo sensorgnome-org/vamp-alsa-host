@@ -45,6 +45,7 @@ TCPListener::TCPListener(string server_socket_name, string label, VampAlsaHost *
   if (listen(pollfd.fd, 5))
     throw std::runtime_error(string("Error listening on port\n"));
   std::cout << "Listening on " << server_socket_name << std::endl;
+  std::cout.flush();
 };
 
 void TCPListener::stop(double timeNow) {
