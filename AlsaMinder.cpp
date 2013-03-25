@@ -174,7 +174,8 @@ int AlsaMinder::getPollFDs (struct pollfd *pollfds) {
   // ALSA weirdness means there may be more than one fd per fcd
   if (pcm && shouldBeRunning) {
     if (numFD != snd_pcm_poll_descriptors(pcm, pollfds, numFD)) {
-      cerr << "{\"error\":\"snd_pcm_poll_descriptors returned error.\",\"device\":\"" << label << "\"}" << endl;
+      cerr << "{\"event\":\"devProblem\",\"error\":\"snd_pcm_poll_descriptors returned error.\",\"devLabel\":\"" << label << "\"}" << endl;
+      cerr.flush();
       return 1;
     }
   }
@@ -200,7 +201,8 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
     host->requestPollFDRegen();
     stop(timeNow);
     if (start(timeNow)) {
-      cerr << "{\"error\":\"poll() returned with error " << errno << "\",\"device\":\"" << label << "\"}" << endl;
+      cerr << "{\"event\":\"devStalled\",\"devLabel\":\"" << label << "\",\"error\":\"poll return with POLLERR and errno=" << errno << "\"}" << endl;
+      cerr.flush();
     }
     return;
   }
@@ -210,7 +212,8 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
 
     snd_pcm_sframes_t avail = snd_pcm_avail_update (pcm);
     if (avail < 0) {
-      cerr << "{\"error\":\"snd_pcm_avail_update() when POLLIN|POLLPRI was true returned with error " << (-avail) << "\",\"device\":\"" << label << "\"}" << endl;
+      cerr << "{\"event\":\"devStalled\",\"error\":\"snd_pcm_avail_update() when POLLIN|POLLPRI was true returned with error " << (-avail) << "\",\"devLabel\":\"" << label << "\"}" << endl;
+      cerr.flush();
       snd_pcm_recover(pcm, avail, 1);
       snd_pcm_prepare(pcm);
       hasError = 0;
@@ -235,7 +238,8 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
 
       int errcode;
       if ((errcode = snd_pcm_mmap_begin (pcm, & areas, & offset, & have))) {
-        cerr << "{\"error\":\" snd_pcm_mmap_begin returned with error " << (-errcode) << "\",\"device\":\"" << label << "\"}" << endl;
+        cerr << "{\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_begin returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"}" << endl;
+        cerr.flush();
         return;
       }
       avail = have;
@@ -349,12 +353,14 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       */
 
       if (0 > snd_pcm_mmap_commit (pcm, offset, avail)) {
-        cerr << "{\"error\":\" snd_pcm_mmap_commit returned with error " << (-errcode) << "\",\"device\":\"" << label << "\"}" << endl;
+        cerr << "{\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_commit returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"}" << endl;
+        cerr.flush();
       }
     }
   } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_FCD_QUIET_TIME) {
     // this fcd appears to have stopped delivering audio; try restart it
-    cerr << "{\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs; restarting\",\"device\":\"" << label << "\"}" << endl;
+    cerr << "{\"event\":\"buffer overflow?\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs; restarting\",\"devLabel\":\"" << label << "\"}" << endl;
+    cerr.flush();
     lastDataReceived = timeNow; // wait before next restart
     stop(timeNow);
     start(timeNow);
