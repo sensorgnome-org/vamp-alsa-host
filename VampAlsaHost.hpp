@@ -37,6 +37,7 @@ protected:
 
 public:
   VampAlsaHost();
+  ~VampAlsaHost();
   void add(std::shared_ptr < Pollable > p);
   void remove(std::shared_ptr < Pollable > p);
   void remove(std::weak_ptr < Pollable > p);

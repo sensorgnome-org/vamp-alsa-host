@@ -15,7 +15,11 @@ VampAlsaHost::VampAlsaHost():
   doing_poll(false)
 {
 };
-  
+
+VampAlsaHost::~VampAlsaHost() {
+  doing_poll = false;
+};
+
 void VampAlsaHost::add(std::shared_ptr < Pollable > p) {
   if (! doing_poll) {
     pollables[p.get()->label] = p;
