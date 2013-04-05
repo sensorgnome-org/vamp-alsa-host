@@ -72,14 +72,15 @@ void VampAlsaHost::requestPollFDRegen() {
   regen_pollfds = true;
 };
 
-void VampAlsaHost::poll(int timeout) {
+int VampAlsaHost::poll(int timeout) {
   doing_poll = true;
 
   regenFDs();
   int rv = ::poll(& pollfds[0], pollfds.size(), timeout);
   if (rv < 0) {
     doing_poll = false;
-    return;
+    std::cerr << "poll returned error - vamp-alsa-host" << std::endl;
+    return errno;
   }
 
   bool timedOut = rv == 0;
@@ -95,7 +96,7 @@ void VampAlsaHost::poll(int timeout) {
   }
   doing_poll = false;
   doDeferrals();
-  return;
+  return 0;
 };
 
 void VampAlsaHost::doDeferrals() {
@@ -344,13 +345,13 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
 };
 
 
-void VampAlsaHost::run()
+int VampAlsaHost::run()
 {
-  cout << setprecision(3);
-
-  for (;;) {
-    poll(10000);
-  }
+  int rv;
+  do {
+    rv = poll(2000); // 2 second timeout
+  } while (! rv);
+  return rv;
 }
 
 double

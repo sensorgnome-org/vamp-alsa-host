@@ -271,10 +271,12 @@ main(int argc, char **argv)
     label << serverSocketName;
     host = new VampAlsaHost();
     host->add (std::make_shared < TCPListener > (serverSocketName, label.str(), host, quiet));
+    int rv = 0;
     try {
-        host->run();
+        rv = host->run();
     } catch (std::runtime_error e) {
         cerr << "vamp-alsa-host terminated\nWhy: " << e.what();
     };
+    exit(rv);
 }
 

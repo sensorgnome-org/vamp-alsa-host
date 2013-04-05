@@ -46,9 +46,9 @@ public:
   std::shared_ptr < Pollable > lookupByNameShared (std::string& label);
   short & eventsOf(Pollable *p, int offset = 0); // reference to the events field for a pollfd
   void requestPollFDRegen();
-  void poll(int timeout);
+  int poll(int timeout); // do one round of polling; return 0 on okay; errno otherwise
   string runCommand(string cmdString, string connLabel);
-  void run();
+  int run();
   double now(bool is_monotonic = false);
   static const string commandHelp;
 

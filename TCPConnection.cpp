@@ -53,15 +53,18 @@ void TCPConnection::queueRawOutput(const char *p, int len, int granularity) {
     
 void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
 
-  // set whether or not to watch for POLLOUT
-  // kludgey to do it here, but this has access to the VampAlsaHost's
-  // set of pollfds, so we can set the events field there.
+  if (pollfds->revents & (POLLERR | POLLHUP | POLLNVAL)) {
+    host->remove(label);
+    host->requestPollFDRegen();
+    return;
+  }
 
   if (pollfds->revents & (POLLIN | POLLRDHUP)) {
     // handle read 
     int len = read(pollfd.fd, cmdString, MAX_CMD_STRING_LENGTH);
     if (len <= 0) {
       host->remove(label);
+      host->requestPollFDRegen();
       // socket has been closed, apparently
       // FIXME: delete this connection via shared_ptr in connections
       return;
