@@ -77,7 +77,10 @@ int AlsaMinder::do_start(double timeNow) {
   hasError = 0;
   snd_pcm_start(pcm);
   stopped = false;
-  startTimestamp = timeNow; // prevent warning about resuming after long pause
+  // set timestamps to:
+  // - prevent warning about resuming after long pause
+  // - allow us to notice no data has been received for too long after startup
+  lastDataReceived = startTimestamp = timeNow; 
   return 0;
 }
 
@@ -171,7 +174,7 @@ int AlsaMinder::getNumPollFDs () {
 
 int AlsaMinder::getPollFDs (struct pollfd *pollfds) {
   // append pollfd(s) for this object to the specified vector
-  // ALSA weirdness means there may be more than one fd per fcd
+  // ALSA weirdness means there may be more than one fd per audio device
   if (pcm && shouldBeRunning) {
     if (numFD != snd_pcm_poll_descriptors(pcm, pollfds, numFD)) {
       cerr << "{\"event\":\"devProblem\",\"error\":\"snd_pcm_poll_descriptors returned error.\",\"devLabel\":\"" << label << "\"}" << endl;
@@ -357,8 +360,8 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         cerr.flush();
       }
     }
-  } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_FCD_QUIET_TIME) {
-    // this fcd appears to have stopped delivering audio; try restart it
+  } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_AUDIO_QUIET_TIME) {
+    // this device appears to have stopped delivering audio; try restart it
     cerr << "{\"event\":\"buffer overflow?\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs; restarting\",\"devLabel\":\"" << label << "\"}" << endl;
     cerr.flush();
     lastDataReceived = timeNow; // wait before next restart

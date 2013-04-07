@@ -30,10 +30,10 @@ public:
 
   static const int  PERIOD_FRAMES         = 2400;   // 50 ms
   static const int  BUFFER_FRAMES         = 131072; // 128K appears to be max buffer size in frames; this is 2.73 seconds
-  static const int  MAX_FCD_QUIET_TIME    = 30;     // 30 second maximum quiet time before we decide an FCD data stream is dry and try restart it
+  static const int  MAX_AUDIO_QUIET_TIME  = 30;     // 30 second maximum quiet time before we decide an audio data stream is dry and try restart it
 
     
-  string             alsaDev;          // ALSA path to fcd device (e.g. hw:CARD=V10)
+  string             alsaDev;          // ALSA path to audio device (e.g. hw:CARD=V10)
   int                rate;             // sampling rate to supply plugins with
   unsigned int       hwRate;           // sampling rate of hardware device
   unsigned int       numChan;          // number of channels to read from device
@@ -41,21 +41,34 @@ public:
 protected:
 
   PluginRunnerSet    plugins;          // set of plugins accepting input from this device
-  RawListenerSet     rawListeners;     // connections receiving raw output from this device, if any.
+  RawListenerSet     rawListeners;     // connections receiving raw output from this device, if
+                                       // any.
   snd_pcm_t *        pcm;              // handle to open pcm device
-  snd_pcm_uframes_t  buffer_frames;    // buffer size given to us by ALSA (we attempt to specify it)
-  snd_pcm_uframes_t  period_frames;    // period size given to us by ALSA (we attempt to specify it)
+  snd_pcm_uframes_t  buffer_frames;    // buffer size given to us by ALSA (we attempt to specify
+                                       // it)
+  snd_pcm_uframes_t  period_frames;    // period size given to us by ALSA (we attempt to specify
+                                       // it)
   unsigned short     revents;          // demangled version of revent returned after poll()
-  long long          totalFrames;      // total frames seen on this FCD since start of capture
-  double             startTimestamp;   // timestamp device was (most recently) started (-1 if never)  CLOCK_REALTIME
-  double             stopTimestamp;    // timestamp device was (most recently) stopped or opened (-1 if not opened yet) CLOCK_REALTIME
-  double             lastDataReceived; // time at which data was last received; used to detect random FCD stop (e.g. due to hub device reset) CLOCK_MONOTONIC
-  bool               shouldBeRunning;  // should this FCD be running?
-  bool               stopped;          // is this FCD stopped?  (by which we mean not streaming USB audio)
-  int                hasError;         // if non-zero, the most recent error this device got while we polled it? (this would have stopped it)
-  int                numFD;            // number of file descriptors required for polling on this device
-  bool               demodFMForRaw;    // if true, any rawListeners receive FM-demodulated samples (reducing stereo to mono)
-  float              demodFMLastTheta; // value of previous phase angle for FM demodulation (in range -pi..pi)
+  long long          totalFrames;      // total frames seen on this device since start of capture
+  double             startTimestamp;   // timestamp device was (most recently) started (-1 if
+                                       // never)
+  double             stopTimestamp;    // timestamp device was (most recently) stopped or opened
+                                       // (-1 if not opened yet)
+  double             lastDataReceived; // time at which data was last received (or at which the
+                                       // device was most recently started); used to detect
+                                       // random audio stop (e.g. due to hub device reset)
+                                       // -1 if never started 
+  bool               shouldBeRunning;  // should this device be running?
+  bool               stopped;          // is this device stopped?  (by which we mean not
+                                       // streaming USB audio)
+  int                hasError;         // if non-zero, the most recent error this device got
+                                       // while we polled it? (this would have stopped it)
+  int                numFD;            // number of file descriptors required for polling on this
+                                       // device
+  bool               demodFMForRaw;    // if true, any rawListeners receive FM-demodulated
+                                       // samples (reducing stereo to mono)
+  float              demodFMLastTheta; // value of previous phase angle for FM demodulation (in
+                                       // range -pi..pi)
 
 public:
 
