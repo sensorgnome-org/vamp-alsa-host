@@ -260,11 +260,10 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       src0 += step * offset;
 
       char * rawBytes;
-      int numRawChan;
       if (numChan == 2 && demodFMForRaw && rawListeners.size() > 0) {
         // do FM demodulation with simple but expensive arctan!
         float dthetaScale = hwRate / (2 * M_PI) / 75000.0 * 32767.0;
-        rawBytes = new char [avail * 2];
+        rawBytes = new char [avail * 4];
         int16_t * samps = (int16_t *) src0;
         for (int i=0, j = 0; i < avail; ++i, j += 2) {
           // get phase angle in -pi..pi
@@ -276,12 +275,10 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
           } else if (dtheta < -M_PI) {
             dtheta += 2 * M_PI;
           }
-          ((int16_t *)rawBytes)[j] = roundf(dthetaScale * dtheta);
+          ((int16_t *)rawBytes)[j+1] = ((int16_t *)rawBytes)[j] = roundf(dthetaScale * dtheta);
         }
-        numRawChan = 1;
       } else {
         rawBytes = (char *) src0;
-        numRawChan = numChan;
       }
       for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
         // FIXME: big assumptions here:
@@ -295,17 +292,17 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
           
           if (ir->second.framesBetweenTimestamps > 0) {
             long long after_timestamp = avail - ir->second.frameCountDown;
-            ptr->queueRawOutput(rawBytes, std::min(ir->second.frameCountDown, (unsigned long long) avail) * numRawChan * 2, numRawChan * 2);
+            ptr->queueRawOutput(rawBytes, std::min(ir->second.frameCountDown, (unsigned long long) avail) * numChan * 2, numChan * 2);
             if (after_timestamp >= 0) {
               ptr->queueRawOutput((char *) &frameTimestamp, sizeof(frameTimestamp), sizeof(frameTimestamp));
               if (after_timestamp > 0)
-                ptr->queueRawOutput(rawBytes, after_timestamp * numRawChan * 2, numRawChan * 2);
+                ptr->queueRawOutput(rawBytes, after_timestamp * numChan * 2, numChan * 2);
               ir->second.frameCountDown = ir->second.framesBetweenTimestamps - after_timestamp;
             } else {
               ir->second.frameCountDown -= avail;
             }
           } else {
-            ptr->queueRawOutput(rawBytes, avail * numRawChan * 2, numRawChan * 2);
+            ptr->queueRawOutput(rawBytes, avail * numChan * 2, numChan * 2);
           }
           ++ir;
         } else {
