@@ -266,7 +266,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         float dthetaScale = hwRate / (2 * M_PI) / 75000.0 * 32767.0;
         rawBytes = new char [avail * 2];
         int16_t * samps = (int16_t *) src0;
-        for (int i=0; i < avail; ++i) {
+        for (int i=0, j = 0; i < avail; ++i, j += 2) {
           // get phase angle in -pi..pi
           float theta = atan2f(samps[2*i], samps[2*i+1]);
           float dtheta = theta - demodFMLastTheta;
@@ -276,7 +276,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
           } else if (dtheta < -M_PI) {
             dtheta += 2 * M_PI;
           }
-          ((int16_t *)rawBytes)[i] = roundf(dthetaScale * dtheta);
+          ((int16_t *)rawBytes)[j] = roundf(dthetaScale * dtheta);
         }
         numRawChan = 1;
       } else {

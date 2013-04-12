@@ -21,21 +21,28 @@ VampAlsaHost::~VampAlsaHost() {
 };
 
 void VampAlsaHost::add(std::shared_ptr < Pollable > p) {
+  auto pp = p.get();
+  if (!pp)
+    return;
   if (! doing_poll) {
-    pollables[p.get()->label] = p;
+    pollables[pp->label] = p;
     regen_pollfds = true;
   } else {
-    deferred_adds[p.get()->label] = p;
+    deferred_adds[pp->label] = p;
     have_deferrals = true;
   }
 }
   
 void VampAlsaHost::remove(std::shared_ptr < Pollable > p) {
+  auto pp = p.get();
+  if (!pp)
+    return;
+
   if (! doing_poll) {
-    pollables.erase(p.get()->label);
+    pollables.erase(pp->label);
     regen_pollfds = true;
   } else {
-    deferred_removes[p.get()->label] = p;
+    deferred_removes[pp->label] = p;
     have_deferrals = true;
   }
 }
@@ -93,6 +100,8 @@ int VampAlsaHost::poll(int timeout) {
 
   for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
     auto ptr = is->second.get();
+    if (!ptr)
+      continue;
     int i = ptr->indexInPollFD;
     if (i < 0)
       continue;
@@ -122,6 +131,8 @@ void VampAlsaHost::regenFDs() {
     pollfds.clear();
     for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); /**/) {
       if (auto ptr = is->second.get()) {
+        if (!ptr)
+          continue;
         int where = pollfds.size();
         int numFDs = ptr->getNumPollFDs();
         if (numFDs > 0) {
@@ -299,7 +310,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       std::shared_ptr < PluginRunner > p = dynamic_pointer_cast < PluginRunner > (ip->second);
       auto ptr = p.get();
       if (ptr)
-        p->setParameters(ps);
+        ptr->setParameters(ps);
     } catch (std::runtime_error e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
     };
