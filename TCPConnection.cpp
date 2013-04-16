@@ -107,7 +107,7 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
     for (;;) { // loop on text lines to output
       int len = outputPartialLine.length();
       if (len > 0) {     
-        int num_bytes = write(pollfd.fd, outputPartialLine.c_str(), len);
+        int num_bytes = write(pollfd.fd, outputPartialLine.data(), len);
         if (num_bytes < 0 ) {
           if (errno != EAGAIN && errno != EWOULDBLOCK) {
       // FIXME: delete this connection via shared_ptr in connections
