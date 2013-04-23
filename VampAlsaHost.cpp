@@ -223,7 +223,8 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     AlsaMinder *p = dynamic_cast < AlsaMinder * > (lookupByName(label));
     if (p) {
       if (word == "rawOn") {
-        p->addRawListener(connLabel, framesBetweenTimestamps);
+        // raw listeners always get mono sound at 48 kHz
+        p->addRawListener(connLabel, framesBetweenTimestamps, p->hwRate / 48000);
       } else if (word == "rawOff") {
         p->removeRawListener(connLabel);
       } else {

@@ -98,11 +98,14 @@ void AlsaMinder::removePluginRunner(std::shared_ptr < PluginRunner > pr) {
   plugins.erase(pr.get());
 };
 
-void AlsaMinder::addRawListener(string connLabel, unsigned long long framesBetweenTimestamps) {
+void AlsaMinder::addRawListener(string connLabel, unsigned long long framesBetweenTimestamps, int downSampleFactor) {
   
   std::shared_ptr < TCPConnection > conn = static_pointer_cast < TCPConnection > (host->lookupByNameShared(connLabel));
   if (conn) {
     rawListeners[connLabel] = {conn, framesBetweenTimestamps, 0};
+    this->downSampleFactor = downSampleFactor;
+    downSampleCount = downSampleFactor;
+    downSampleAccum = 0;
   }
 };
 
@@ -255,66 +258,80 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         if a raw output connection exists, queue the new data onto it
       */
 
-      src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
-      step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
-      src0 += step * offset;
+      if (rawListeners.size() > 0) {
+        src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
+        step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
+        src0 += step * offset;
 
-      char * rawBytes;
-      if (numChan == 2 && demodFMForRaw && rawListeners.size() > 0) {
-        // do FM demodulation with simple but expensive arctan!
-        float dthetaScale = hwRate / (2 * M_PI) / 75000.0 * 32767.0;
-        rawBytes = new char [avail * 4];
-        int16_t * samps = (int16_t *) src0;
-        for (int i=0, j = 0; i < avail; ++i, j += 2) {
-          // get phase angle in -pi..pi
-          float theta = atan2f(samps[2*i], samps[2*i+1]);
-          float dtheta = theta - demodFMLastTheta;
-          demodFMLastTheta = theta;
-          if (dtheta > M_PI) {
-            dtheta -= 2 * M_PI;
-          } else if (dtheta < -M_PI) {
-            dtheta += 2 * M_PI;
-          }
-          ((int16_t *)rawBytes)[j+1] = ((int16_t *)rawBytes)[j] = roundf(dthetaScale * dtheta);
-        }
-      } else {
-        rawBytes = (char *) src0;
-      }
-      for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
-        // FIXME: big assumptions here:
-        // - S16_LE sample format
-        // - samples occupy a contiguous area of memory, starting at the first byte
-        //   of the first sample on channel 0
-
-        if (auto ptr = (ir->second.con).lock()) {
-          // if we're emitting timestamps between frames, see whether
-          // we'll need to do that before the end of this batch
-          
-          if (ir->second.framesBetweenTimestamps > 0) {
-            long long after_timestamp = avail - ir->second.frameCountDown;
-            ptr->queueRawOutput(rawBytes, std::min(ir->second.frameCountDown, (unsigned long long) avail) * numChan * 2, numChan * 2);
-            if (after_timestamp >= 0) {
-              ptr->queueRawOutput((char *) &frameTimestamp, sizeof(frameTimestamp), sizeof(frameTimestamp));
-              if (after_timestamp > 0)
-                ptr->queueRawOutput(rawBytes, after_timestamp * numChan * 2, numChan * 2);
-              ir->second.frameCountDown = ir->second.framesBetweenTimestamps - after_timestamp;
-            } else {
-              ir->second.frameCountDown -= avail;
+        int16_t rawSamples[avail];
+        if (numChan == 2 && demodFMForRaw) {
+          // do FM demodulation with simple but expensive arctan!
+          float dthetaScale = hwRate / (2 * M_PI) / 75000.0 * 32767.0;
+          int16_t * samps = (int16_t *) src0;
+          for (int i=0; i < avail; ++i) {
+            // get phase angle in -pi..pi
+            float theta = atan2f(samps[2*i], samps[2*i+1]);
+            float dtheta = theta - demodFMLastTheta;
+            demodFMLastTheta = theta;
+            if (dtheta > M_PI) {
+              dtheta -= 2 * M_PI;
+            } else if (dtheta < -M_PI) {
+              dtheta += 2 * M_PI;
             }
-          } else {
-            ptr->queueRawOutput(rawBytes, avail * numChan * 2, numChan * 2);
+            rawSamples[i] = roundf(dthetaScale * dtheta);
           }
-          ++ir;
         } else {
-          RawListenerSet::iterator to_delete = ir++;
-          rawListeners.erase(to_delete);
+          for (int i=0; i < avail; ++i) {
+            rawSamples[i] = *src0;
+            src0 += step;
+          }
+        }
+
+        // now downsample rawSamples, using the running accumulator
+        // we downsample in-place, keeping track of the destination
+        // index in downSampleAvail;
+
+        int downSampleAvail = 0;
+        for (int i=0; i < avail; ++i) {
+          downSampleAccum += rawSamples[i];
+          if (! --downSampleCount) {
+            downSampleCount = downSampleFactor;
+            // simple dithering: round to nearest int, but retain remainder in downSampleAccum
+            int16_t downSample = (downSampleAccum + downSampleFactor / 2) / downSampleFactor;
+            rawSamples[downSampleAvail++] = downSample;
+            downSampleAccum -= downSample * downSampleFactor;
+          }
+        }
+
+        // there are now downSampleAvail samples, stored in rawSamples[0..downSampleAvail - 1]
+
+        for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
+
+          if (auto ptr = (ir->second.con).lock()) {
+            // if we're emitting timestamps between frames, see whether
+            // we'll need to do that before the end of this batch
+          
+            if (ir->second.framesBetweenTimestamps > 0) {
+              long long after_timestamp = downSampleAvail - ir->second.frameCountDown;
+              ptr->queueRawOutput((char *) rawSamples, std::min(ir->second.frameCountDown, (unsigned long long) downSampleAvail) * 2, 2);
+              if (after_timestamp >= 0) {
+                ptr->queueRawOutput((char *) &frameTimestamp, sizeof(frameTimestamp), sizeof(frameTimestamp));
+                if (after_timestamp > 0)
+                  ptr->queueRawOutput((char *) rawSamples, after_timestamp * 2, 2);
+                ir->second.frameCountDown = ir->second.framesBetweenTimestamps - after_timestamp;
+              } else {
+                ir->second.frameCountDown -= downSampleAvail;
+              }
+            } else {
+              ptr->queueRawOutput((char *) rawSamples, downSampleAvail * 2, 2);
+            }
+            ++ir;
+          } else {
+            RawListenerSet::iterator to_delete = ir++;
+            rawListeners.erase(to_delete);
+          }
         }
       }
-      if (rawBytes != (char *) src0) {
-        delete [] rawBytes;
-        rawBytes = 0;
-      }
-
       /*
       copy from ALSA mmap buffers to each attached plugin's buffer,
       converting from S16_LE to float, and calling the plugin if its

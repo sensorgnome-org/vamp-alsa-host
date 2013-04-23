@@ -40,42 +40,45 @@ public:
 
 protected:
 
-  PluginRunnerSet    plugins;          // set of plugins accepting input from this device
-  RawListenerSet     rawListeners;     // connections receiving raw output from this device, if
-                                       // any.
-  snd_pcm_t *        pcm;              // handle to open pcm device
-  snd_pcm_uframes_t  buffer_frames;    // buffer size given to us by ALSA (we attempt to specify
-                                       // it)
-  snd_pcm_uframes_t  period_frames;    // period size given to us by ALSA (we attempt to specify
-                                       // it)
-  unsigned short     revents;          // demangled version of revent returned after poll()
-  long long          totalFrames;      // total frames seen on this device since start of capture
-  double             startTimestamp;   // timestamp device was (most recently) started (-1 if
-                                       // never)
-  double             stopTimestamp;    // timestamp device was (most recently) stopped or opened
-                                       // (-1 if not opened yet)
-  double             lastDataReceived; // time at which data was last received (or at which the
-                                       // device was most recently started); used to detect
-                                       // random audio stop (e.g. due to hub device reset)
-                                       // -1 if never started 
-  bool               shouldBeRunning;  // should this device be running?
-  bool               stopped;          // is this device stopped?  (by which we mean not
-                                       // streaming USB audio)
-  int                hasError;         // if non-zero, the most recent error this device got
-                                       // while we polled it? (this would have stopped it)
-  int                numFD;            // number of file descriptors required for polling on this
-                                       // device
-  bool               demodFMForRaw;    // if true, any rawListeners receive FM-demodulated
-                                       // samples (reducing stereo to mono)
-  float              demodFMLastTheta; // value of previous phase angle for FM demodulation (in
-                                       // range -pi..pi)
+  PluginRunnerSet   plugins;          // set of plugins accepting input from this device
+  RawListenerSet    rawListeners;     // connections receiving raw output from this device, if
+                                      // any.
+  snd_pcm_t *       pcm;              // handle to open pcm device
+  snd_pcm_uframes_t buffer_frames;    // buffer size given to us by ALSA (we attempt to specify
+                                      // it)
+  snd_pcm_uframes_t period_frames;    // period size given to us by ALSA (we attempt to specify
+                                      // it)
+  unsigned short    revents;          // demangled version of revent returned after poll()
+  long long         totalFrames;      // total frames seen on this device since start of capture
+  double            startTimestamp;   // timestamp device was (most recently) started (-1 if
+                                      // never)
+  double            stopTimestamp;    // timestamp device was (most recently) stopped or opened
+                                      // (-1 if not opened yet)
+  double            lastDataReceived; // time at which data was last received (or at which the
+                                      // device was most recently started); used to detect
+                                      // random audio stop (e.g. due to hub device reset)
+                                      // -1 if never started 
+  bool              shouldBeRunning;  // should this device be running?
+  bool              stopped;          // is this device stopped?  (by which we mean not
+                                      // streaming USB audio)
+  int               hasError;         // if non-zero, the most recent error this device got
+                                      // while we polled it? (this would have stopped it)
+  int               numFD;            // number of file descriptors required for polling on this
+                                      // device
+  bool              demodFMForRaw;    // if true, any rawListeners receive FM-demodulated
+                                      // samples (reducing stereo to mono)
+  float             demodFMLastTheta; // value of previous phase angle for FM demodulation (in
+                                      // range -pi..pi)
+  int16_t           downSampleFactor; // by what factor do we downsample input audio for raw listeners
+  int16_t           downSampleCount;  // count of how many samples we've accumulated since last down sample
+  int32_t           downSampleAccum;  // accumulator for downsampling
 
 public:
 
   int open();
   void addPluginRunner(std::shared_ptr < PluginRunner > pr);
   void removePluginRunner(std::shared_ptr < PluginRunner > pr);
-  void addRawListener(string connLabel, unsigned long long framesBetweenTimestamps);
+  void addRawListener(string connLabel, unsigned long long framesBetweenTimestamps, int downSampleFactor);
   void removeRawListener(string connLabel);
   void removeAllRawListeners();
 
