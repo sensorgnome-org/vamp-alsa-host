@@ -313,17 +313,17 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
           
             if (ir->second.framesBetweenTimestamps > 0) {
               long long after_timestamp = downSampleAvail - ir->second.frameCountDown;
-              ptr->queueRawOutput((char *) rawSamples, std::min(ir->second.frameCountDown, (unsigned long long) downSampleAvail) * 2, 2);
+              ptr->queueOutput((char *) rawSamples, std::min(ir->second.frameCountDown, (unsigned long long) downSampleAvail) * 2);
               if (after_timestamp >= 0) {
-                ptr->queueRawOutput((char *) &frameTimestamp, sizeof(frameTimestamp), sizeof(frameTimestamp));
+                ptr->queueOutput((char *) &frameTimestamp, sizeof(frameTimestamp));
                 if (after_timestamp > 0)
-                  ptr->queueRawOutput((char *) rawSamples, after_timestamp * 2, 2);
+                  ptr->queueOutput((char *) rawSamples, after_timestamp * 2);
                 ir->second.frameCountDown = ir->second.framesBetweenTimestamps - after_timestamp;
               } else {
                 ir->second.frameCountDown -= downSampleAvail;
               }
             } else {
-              ptr->queueRawOutput((char *) rawSamples, downSampleAvail * 2, 2);
+              ptr->queueOutput((char *) rawSamples, downSampleAvail * 2);
             }
             ++ir;
           } else {

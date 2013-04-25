@@ -20,16 +20,11 @@ class TCPConnection : public Pollable {
 protected: 
   struct pollfd pollfd;
   static const unsigned MAX_CMD_STRING_LENGTH = 256;    // size of buffer for receiving commands over TCP
-  static const unsigned MAX_OUTPUT_FLOAT_BUFFER_SIZE = 8192;  // maximum size of float output buffer = 2K floats
-  static const unsigned MAX_OUTPUT_LINE_BUFFER_SIZE = 128; // max # of text lines buffered for output
-  static const unsigned MAX_OUTPUT_RAW_BUFFER_SIZE = 32768; // maximum size of raw frame buffer in bytes; = 8k stereo 16-bit frames
+  static const unsigned MAX_OUTPUT_BUFFER_SIZE = 2097152; // maximum size of raw frame buffer in bytes; ~ 11 seconds at 48k in 16-bit stereo
 
   char cmdString[MAX_CMD_STRING_LENGTH + 1];    // buffer for input from TCP
   string inputBuff;   // input from TCP socket which has not been processed yet
-  boost::circular_buffer < string > outputLineBuffer;  // output text lines waiting to be written back to socket
-  boost::circular_buffer < float > outputFloatBuffer;  // output float data waiting to be written back to socket
-  boost::circular_buffer < char > outputRawBuffer;  // output raw data waiting to be written back to socket
-  int outputRawBufferGranularity; // granularity of raw output, in bytes; each chunk is either sent or not; no partial chunks are sent.
+  boost::circular_buffer < char > outputBuffer;  // output data waiting to be written back to socket
 
   string outputPartialLine; // if only part of an output chunk has been sent on the connection, this holds the rest
 
@@ -41,11 +36,9 @@ public:
 
   int getPollFDs (struct pollfd * pollfds);
 
-  void queueRawOutput(const char *p, int len, int granularity);
+  bool queueOutput(const char *p, int len);
 
-  void queueFloatOutput(std::vector < float > & f);
-
-  void queueTextOutput(string s);
+  bool queueOutput(const std::string);
     
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 

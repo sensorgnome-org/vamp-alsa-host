@@ -192,6 +192,8 @@ void terminate (int p)
         return;
     terminating = true;
     delete host;
+    std::cerr << "vamp-alsa-host terminating with code " << p << std::endl;
+    std::cerr.flush();
     exit(p);
 }
 
@@ -227,6 +229,7 @@ main(int argc, char **argv)
                 serverSocketName = string(optarg);
                 if (serverSocketName.find('/') != string::npos) {
                     std::cerr << "error: socket name must not contain '/': it is always created in /tmp\n";
+                    std::cerr.flush();
                     exit(2);
                 }
                 serverSocketName = string("/tmp/") + optarg;
@@ -254,6 +257,7 @@ main(int argc, char **argv)
     }
     if (!okay) {
         std::cerr << "error: '" << serverSocketName << "' exists and has wrong permissions or is not a socket\n";
+        std::cerr.flush();
         exit(3);
     };
     unlink(serverSocketName.c_str());

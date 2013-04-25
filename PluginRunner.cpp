@@ -272,7 +272,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
       // copy values as raw bytes to any outputListeners
       for (OutputListenerSet::iterator io = outputListeners.begin(); io != outputListeners.end(); /**/) {
         if (auto ptr = (io->second).lock()) {
-          ptr->queueFloatOutput(f->values);
+          ptr->queueOutput((char *)& f->values[0], f->values.size() * sizeof(f->values[0]));
           ++io;
         } else {
           OutputListenerSet::iterator to_delete = io++;
@@ -310,7 +310,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
       // send output as text to any outputListeners
       for (OutputListenerSet::iterator io = outputListeners.begin(); io != outputListeners.end(); /**/) {
         if (auto ptr = (io->second).lock()) {
-          ptr->queueTextOutput(txt.str());
+          ptr->queueOutput(txt.str());
           ++io;
         } else {
           OutputListenerSet::iterator to_delete = io++;
