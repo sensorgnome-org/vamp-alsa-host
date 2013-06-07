@@ -13,6 +13,7 @@ clean:
 install: vamp-alsa-host
 	strip vamp-alsa-host
 	cp vamp-alsa-host /usr/bin
+	cp vamp-host /usr/bin
 
 AlsaMinder.o: AlsaMinder.cpp
 	g++ $(CCOPTS) -c -o $@ $<
@@ -32,8 +33,14 @@ TCPConnection.o: TCPConnection.cpp
 vamp-alsa-host.o: vamp-alsa-host.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
+vamp-host.o: vamp-host.cpp
+	g++  $(CCOPTS) -c -o $@ $<
+
 vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o PluginRunner.o VampAlsaHost.o AlsaMinder.o
 	g++ $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk
+
+vamp-host: vamp-host.o
+	g++  -o $@ $^ -lvamp-hostsdk -lsndfile -ldl
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
