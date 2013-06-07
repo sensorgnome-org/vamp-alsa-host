@@ -316,7 +316,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
               long long before_timestamp = std::min(ir->second.frameCountDown, (unsigned long long) downSampleAvail);
               ptr->queueOutput((char *) rawSamples, before_timestamp * 2);
               if (after_timestamp >= 0) {
-                double blockTimestamp = frameTimestamp + before_timestamp * (hwRate / downSampleFactor);
+                double blockTimestamp = frameTimestamp + before_timestamp / ((double) hwRate / downSampleFactor);
                 ptr->queueOutput((char *) &blockTimestamp, sizeof(blockTimestamp));
                 if (after_timestamp > 0)
                   ptr->queueOutput((char *) rawSamples, after_timestamp * 2);
