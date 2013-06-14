@@ -16,9 +16,9 @@ using namespace Vamp::HostExt;
 
 #include "ParamSet.hpp"
 #include "Pollable.hpp"
-#include "TCPConnection.hpp"
+#include "OutputListener.hpp"
 
-typedef std::map < string, std::weak_ptr < TCPConnection > > OutputListenerSet;
+typedef std::map < string, std::weak_ptr < OutputListener > > OutputListenerSet;
 
 class AlsaMinder;
 

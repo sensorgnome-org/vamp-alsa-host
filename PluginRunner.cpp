@@ -156,19 +156,19 @@ PluginRunner::~PluginRunner() {
   delete_privates();
 };
 
-bool PluginRunner::addOutputListener(string connLabel) {
+bool PluginRunner::addOutputListener(string label) {
   
-  std::shared_ptr < TCPConnection > conn = static_pointer_cast < TCPConnection > (host->lookupByNameShared(connLabel));
-  if (conn) {
-    outputListeners[connLabel] = conn;
+  std::shared_ptr < OutputListener > outl = static_pointer_cast < OutputListener > (host->lookupByNameShared(label));
+  if (outl) {
+    outputListeners[label] = outl;
     return true;
   } else {
     return false;
   }
 };
 
-void PluginRunner::removeOutputListener(string connLabel) {
-  outputListeners.erase(connLabel);
+void PluginRunner::removeOutputListener(string label) {
+  outputListeners.erase(label);
 };
 
 void PluginRunner::removeAllOutputListeners() {

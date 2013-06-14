@@ -14,15 +14,9 @@ using namespace std;
 
 #include "Pollable.hpp"
 #include "PluginRunner.hpp"
-#include "TCPConnection.hpp"
+#include "RawListener.hpp"
 
-typedef struct {
-  std::weak_ptr < TCPConnection > con;
-  unsigned long long framesBetweenTimestamps;
-  unsigned long long frameCountDown;
-} rawListener;
-
-typedef std::map < string, rawListener > RawListenerSet;
+typedef std::map < string, std::weak_ptr < RawListener > > RawListenerSet;
 typedef std::map < PluginRunner *, std::weak_ptr < PluginRunner > > PluginRunnerSet;
 
 class AlsaMinder : public Pollable {
@@ -41,7 +35,7 @@ public:
 protected:
 
   PluginRunnerSet   plugins;          // set of plugins accepting input from this device
-  RawListenerSet    rawListeners;     // connections receiving raw output from this device, if
+  RawListenerSet    rawListeners;     // listeners receiving raw output from this device, if
                                       // any.
   snd_pcm_t *       pcm;              // handle to open pcm device
   snd_pcm_uframes_t buffer_frames;    // buffer size given to us by ALSA (we attempt to specify
@@ -78,8 +72,8 @@ public:
   int open();
   void addPluginRunner(std::shared_ptr < PluginRunner > pr);
   void removePluginRunner(std::shared_ptr < PluginRunner > pr);
-  void addRawListener(string connLabel, unsigned long long framesBetweenTimestamps, int downSampleFactor);
-  void removeRawListener(string connLabel);
+  void addRawListener(string label, unsigned long long framesBetweenTimestamps, int downSampleFactor);
+  void removeRawListener(string label);
   void removeAllRawListeners();
 
   AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, VampAlsaHost * host);

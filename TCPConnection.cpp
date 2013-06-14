@@ -1,8 +1,7 @@
 #include "TCPConnection.hpp"
 
 TCPConnection::TCPConnection (int fd, VampAlsaHost * host, string label, bool quiet) : 
-  Pollable(host, label),
-  outputBuffer(MAX_OUTPUT_BUFFER_SIZE)
+  Pollable(host, label)
 {
   static string msg ( "{"
     "\"message\":\"Welcome to vamp_alsa_host.  Type 'help' for help.\","
@@ -23,11 +22,10 @@ int TCPConnection::getPollFDs (struct pollfd * pollfds) {
   return 0;
 };
 
-bool TCPConnection::queueOutput(const char *p, int len) {
-  if ((unsigned) len > outputBuffer.reserve())
+bool TCPConnection::queueOutput(const char *p, uint_32 len, double lastTimestamp) {
+  if (! outputListener.queueOutput(p, len, lastTimestamp))
     return false;
 
-  outputBuffer.insert(outputBuffer.end(), p, p+len);
   pollfd.events |= POLLOUT;
   if (indexInPollFD >= 0)
     host->eventsOf(this) = pollfd.events;
@@ -79,29 +77,18 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
   }
 
   if (pollfds->revents & (POLLOUT)) {
-    // handle writeable:
-    // if there's raw output to send, send as much as possible
-
-    int len = outputBuffer.size();
-    if (len > 0) {
-      // write only from the first array; a subsequent call to this handler can write data
-      // which is now in the second array but which will eventually be in the first array.
-      boost::circular_buffer < char > ::array_range aone = outputBuffer.array_one();
-      int num_bytes = write(pollfd.fd, (char *) aone.first, aone.second);
-      if (num_bytes == len) {
-        outputBuffer.clear();
-      } else if (num_bytes >= 0) {
-        outputBuffer.erase_begin(num_bytes);
-      } else {
-        // socket has been closed or has an error; we just kill this connection
-        host->remove(label);
-        host->requestPollFDRegen();
-      }
-    } else {
-      host->eventsOf(this) &= ~POLLOUT;
-    }
   }
 };
+
+void TCPConnection::setOutputWaiting(bool yesno) {
+  if (yesno) {
+    pollfd.events |= POLLOUT;
+    if (indexInPollFD >= 0)
+      host->eventsOf(this) = pollfd.events;
+  } else {
+      host->eventsOf(this) &= ~POLLOUT;
+  }
+}
 
 void TCPConnection::stop(double timeNow) {
   /* do nothing */

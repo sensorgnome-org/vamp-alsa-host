@@ -98,19 +98,21 @@ void AlsaMinder::removePluginRunner(std::shared_ptr < PluginRunner > pr) {
   plugins.erase(pr.get());
 };
 
-void AlsaMinder::addRawListener(string connLabel, unsigned long long framesBetweenTimestamps, int downSampleFactor) {
+void AlsaMinder::addRawListener(string label, int downSampleFactor) {
   
-  std::shared_ptr < TCPConnection > conn = static_pointer_cast < TCPConnection > (host->lookupByNameShared(connLabel));
-  if (conn) {
-    rawListeners[connLabel] = {conn, framesBetweenTimestamps, 0};
-    this->downSampleFactor = downSampleFactor;
-    downSampleCount = downSampleFactor;
-    downSampleAccum = 0;
+  std::shared_ptr < RawListener > rawl = static_pointer_cast < RawListener > (host->lookupByNameShared(label));
+  if (rawl) {
+    rawListeners[label] = rawl;
+    if (rawListeners.size() == 1) {
+      this->downSampleFactor = downSampleFactor;
+      downSampleCount = downSampleFactor;
+      downSampleAccum = 0;
+    }
   }
 };
 
-void AlsaMinder::removeRawListener(string connLabel) {
-  rawListeners.erase(connLabel);
+void AlsaMinder::removeRawListener(string label) {
+  rawListeners.erase(label);
 };
 
 void AlsaMinder::removeAllRawListeners() {
@@ -255,7 +257,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       int step;
 
       /*
-        if a raw output connection exists, queue the new data onto it
+        if a raw output listener exists, queue the new data onto it
       */
 
       if (rawListeners.size() > 0) {
@@ -291,16 +293,22 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         // we downsample in-place, keeping track of the destination
         // index in downSampleAvail;
 
-        int downSampleAvail = 0;
-        for (int i=0; i < avail; ++i) {
-          downSampleAccum += rawSamples[i];
-          if (! --downSampleCount) {
-            downSampleCount = downSampleFactor;
-            // simple dithering: round to nearest int, but retain remainder in downSampleAccum
-            int16_t downSample = (downSampleAccum + downSampleFactor / 2) / downSampleFactor;
-            rawSamples[downSampleAvail++] = downSample;
-            downSampleAccum -= downSample * downSampleFactor;
+        int downSampleAvail;
+
+        if (downSampleFactor > 1) {
+          downSampleAvail = 0;
+          for (int i=0; i < avail; ++i) {
+            downSampleAccum += rawSamples[i];
+            if (! --downSampleCount) {
+              downSampleCount = downSampleFactor;
+              // simple dithering: round to nearest int, but retain remainder in downSampleAccum
+              int16_t downSample = (downSampleAccum + downSampleFactor / 2) / downSampleFactor;
+              rawSamples[downSampleAvail++] = downSample;
+              downSampleAccum -= downSample * downSampleFactor;
+            }
           }
+        } else {
+          downSampleAvail = avail;
         }
 
         // there are now downSampleAvail samples, stored in rawSamples[0..downSampleAvail - 1]
@@ -308,25 +316,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
 
           if (auto ptr = (ir->second.con).lock()) {
-            // if we're emitting timestamps between frames, see whether
-            // we'll need to do that before the end of this batch
-          
-            if (ir->second.framesBetweenTimestamps > 0) {
-              long long after_timestamp = downSampleAvail - ir->second.frameCountDown;
-              long long before_timestamp = std::min(ir->second.frameCountDown, (unsigned long long) downSampleAvail);
-              ptr->queueOutput((char *) rawSamples, before_timestamp * 2);
-              if (after_timestamp >= 0) {
-                double blockTimestamp = frameTimestamp + before_timestamp / ((double) hwRate / downSampleFactor);
-                ptr->queueOutput((char *) &blockTimestamp, sizeof(blockTimestamp));
-                if (after_timestamp > 0)
-                  ptr->queueOutput((char *) rawSamples, after_timestamp * 2);
-                ir->second.frameCountDown = ir->second.framesBetweenTimestamps - after_timestamp;
-              } else {
-                ir->second.frameCountDown -= downSampleAvail;
-              }
-            } else {
-              ptr->queueOutput((char *) rawSamples, downSampleAvail * 2);
-            }
+            ptr->queueOutput((char *) rawSamples, downSampleAvail * 2, frameTimeStamp + downSampleAvail * (double) downSampleFactor / hwRate); // NB: hardcoded S16_LE sample size
             ++ir;
           } else {
             RawListenerSet::iterator to_delete = ir++;
