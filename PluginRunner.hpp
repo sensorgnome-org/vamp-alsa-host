@@ -16,9 +16,8 @@ using namespace Vamp::HostExt;
 
 #include "ParamSet.hpp"
 #include "Pollable.hpp"
-#include "OutputListener.hpp"
 
-typedef std::map < string, std::weak_ptr < OutputListener > > OutputListenerSet;
+typedef std::map < string, std::weak_ptr < Pollable > > OutputListenerSet;
 
 class AlsaMinder;
 
@@ -60,7 +59,7 @@ protected:
   OutputListenerSet     outputListeners;     // connections receiving output from this plugin, if any.
 
 public:
-  PluginRunner(string &label, string &devLabel, int rate, int hwRate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, VampAlsaHost *host);
+  PluginRunner(string &label, string &devLabel, int rate, int hwRate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps);
   ~PluginRunner();
 
   bool addOutputListener(string connLabel);
@@ -75,6 +74,8 @@ public:
   int getNumPollFDs();
                       // return number of fds used by this Pollable (negative means error)
   int getPollFDs (struct pollfd * pollfds);
+
+  int getOutputFD(){return 0;}; 
 
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 

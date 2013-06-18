@@ -1,7 +1,19 @@
 #include "TCPConnection.hpp"
 
-TCPConnection::TCPConnection (int fd, VampAlsaHost * host, string label, bool quiet) : 
-  Pollable(host, label)
+string TCPConnection::toJSON() {
+  ostringstream s;
+  s << "{" 
+    << "\"type\":\"TCPConnection\","
+    << "\"fileDescriptor\":" << pollfd.fd
+    << "\"timeConnected\":" << timeConnected
+    << "}";
+  return s.str();
+};
+
+TCPConnection::TCPConnection (int fd, string label, CommandHandler handler, bool quiet, double timeNow) : 
+  Pollable(label),
+  handler(handler),
+  timeConnected(timeNow)
 {
   static string msg ( "{"
     "\"message\":\"Welcome to vamp_alsa_host.  Type 'help' for help.\","
@@ -22,34 +34,24 @@ int TCPConnection::getPollFDs (struct pollfd * pollfds) {
   return 0;
 };
 
-bool TCPConnection::queueOutput(const char *p, uint_32 len, double lastTimestamp) {
-  if (! outputListener.queueOutput(p, len, lastTimestamp))
-    return false;
-
-  pollfd.events |= POLLOUT;
-  if (indexInPollFD >= 0)
-    host->eventsOf(this) = pollfd.events;
-  return true;
-};
-
-bool TCPConnection::queueOutput(const std::string s) {
-  return queueOutput(s.data(), s.length());
+int TCPConnection::getOutputFD() {
+  return pollfd.fd;
 };
 
 void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
 
   if (pollfds->revents & (POLLERR | POLLHUP | POLLNVAL)) {
-    host->remove(label);
-    host->requestPollFDRegen();
+    remove(label);
+    requestPollFDRegen();
     return;
   }
 
   if (pollfds->revents & (POLLIN | POLLRDHUP)) {
     // handle read 
-    int len = read(pollfd.fd, cmdString, MAX_CMD_STRING_LENGTH);
+    int len = read(pollfd.fd, cmdString, VampAlsaHost::MAX_CMD_STRING_LENGTH);
     if (len <= 0) {
-      host->remove(label);
-      host->requestPollFDRegen();
+      remove(label);
+      requestPollFDRegen();
       // socket has been closed, apparently
       // FIXME: delete this connection via shared_ptr in connections
       return;
@@ -61,8 +63,8 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
       size_t pos = inputBuff.find('\n');
       if (pos == inputBuff.npos) {
         // none found; prevent input buffer from growing too big
-        if (inputBuff.npos > MAX_CMD_STRING_LENGTH)
-          inputBuff.erase(0, inputBuff.npos - MAX_CMD_STRING_LENGTH);
+        if (inputBuff.npos > VampAlsaHost::MAX_CMD_STRING_LENGTH)
+          inputBuff.erase(0, inputBuff.npos - VampAlsaHost::MAX_CMD_STRING_LENGTH);
         return;
       }
       
@@ -72,38 +74,28 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
       // last MAX_CMD_STRING_LENGTH characters of inputBuff, removing the command
       // will keep that buffer's length <= MAX_CMD_STRING_LENGTH
       inputBuff.erase(0, pos + 1);
-      queueOutput(host->runCommand(cmd, label)); // call the toplevel
+      string rv = (*handler)(cmd, label);
+      queueOutput(rv); // call the command handler
     }
   }
 
   if (pollfds->revents & (POLLOUT)) {
+    writeSomeOutput(outputBuffer.size());
   }
 };
 
-void TCPConnection::setOutputWaiting(bool yesno) {
-  if (yesno) {
-    pollfd.events |= POLLOUT;
-    if (indexInPollFD >= 0)
-      host->eventsOf(this) = pollfd.events;
-  } else {
-      host->eventsOf(this) &= ~POLLOUT;
-  }
-}
-
 void TCPConnection::stop(double timeNow) {
-  /* do nothing */
+  outputPaused = true;
 };
 
 int TCPConnection::start(double timeNow) {
   /* do nothing */
+  outputPaused = false;
   return 0;
 };
 
-string TCPConnection::toJSON() {
-  ostringstream s;
-  s << "{" 
-    << "\"type\":\"TCPConnection\","
-    << "\"fileDescriptor\":" << pollfd.fd
-    << "}";
-  return s.str();
+void TCPConnection::setRawOutput(bool yesno) {
+  unsigned capacity = yesno ? RAW_OUTPUT_BUFFER_SIZE : DEFAULT_OUTPUT_BUFFER_SIZE;
+  if( capacity != outputBuffer.capacity())
+    outputBuffer = boost::circular_buffer < char > (capacity);
 };

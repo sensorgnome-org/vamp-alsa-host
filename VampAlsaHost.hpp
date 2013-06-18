@@ -19,43 +19,25 @@ using std::string;
 using std::istringstream;
 using std::ostringstream;
 
-class Pollable;
-
-typedef std::map < std::string, std::shared_ptr < Pollable > > PollableSet;
+// type that handles commands
+typedef string (*CommandHandler) (string cmd, string connLabel);
 
 class VampAlsaHost {
 
 protected:
-  PollableSet pollables; // map of Pollables, indexed by label, values are shared pointers; this owns its objects
-  string defaultOutputListener; // label of connection which will be automatically added as an outputListener to any new attached plugin 
-  std::vector <struct pollfd> pollfds; // in same order as pollables, but some pollables may have 0 or more than 1 FD
-  PollableSet deferred_adds;
-  PollableSet deferred_removes;
-  bool regen_pollfds;
-  bool have_deferrals;
-  bool doing_poll;
+  static string defaultOutputListener; // label of connection which will be automatically added as an outputListener to any new attached plugin 
 
 public:
+  static const unsigned MAX_CMD_STRING_LENGTH = 512;    // size of buffer for receiving commands over TCP
+
   VampAlsaHost();
   ~VampAlsaHost();
-  void add(std::shared_ptr < Pollable > p);
-  void remove(std::shared_ptr < Pollable > p);
-  void remove(std::weak_ptr < Pollable > p);
-  void remove(string& label);
-  void remove(Pollable * p);
-  Pollable * lookupByName (std::string& label);
-  std::shared_ptr < Pollable > lookupByNameShared (std::string& label);
-  short & eventsOf(Pollable *p, int offset = 0); // reference to the events field for a pollfd
-  void requestPollFDRegen();
-  int poll(int timeout); // do one round of polling; return 0 on okay; errno otherwise
-  string runCommand(string cmdString, string connLabel);
+  static string runCommand(string cmdString, string connLabel);
   int run();
-  double now(bool is_monotonic = false);
+  static double now(bool is_monotonic = false);
   static const string commandHelp;
 
 protected:
-  void doDeferrals();  
-  void regenFDs();
 };
 
 #endif // VAMPALSAHOST_HPP

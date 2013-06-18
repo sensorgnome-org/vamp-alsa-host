@@ -21,6 +21,9 @@ AlsaMinder.o: AlsaMinder.cpp
 PluginRunner.o: PluginRunner.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
+Pollable.o: Pollable.cpp
+	g++ $(CCOPTS) -c -o $@ $<
+
 VampAlsaHost.o: VampAlsaHost.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
@@ -30,13 +33,16 @@ TCPListener.o: TCPListener.cpp
 TCPConnection.o: TCPConnection.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
+WavFileWriter.o: WavFileWriter.cpp
+	g++ $(CCOPTS) -c -o $@ $<
+
 vamp-alsa-host.o: vamp-alsa-host.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
 vamp-host.o: vamp-host.cpp
 	g++  $(CCOPTS) -c -o $@ $<
 
-vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o PluginRunner.o VampAlsaHost.o AlsaMinder.o
+vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o PluginRunner.o VampAlsaHost.o AlsaMinder.o WavFileWriter.o
 	g++ $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk
 
 vamp-host: vamp-host.o
@@ -45,20 +51,24 @@ vamp-host: vamp-host.o
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
 AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
-AlsaMinder.o: ParamSet.hpp TCPConnection.hpp
+AlsaMinder.o: ParamSet.hpp
+OutputListener.o: OutputListener.hpp
 PluginRunner.o: PluginRunner.hpp ParamSet.hpp Pollable.hpp VampAlsaHost.hpp
-PluginRunner.o: TCPConnection.hpp AlsaMinder.hpp
+PluginRunner.o: AlsaMinder.hpp
 TCPConnection.o: TCPConnection.hpp Pollable.hpp VampAlsaHost.hpp
 TCPListener.o: TCPListener.hpp Pollable.hpp VampAlsaHost.hpp
 TCPListener.o: TCPConnection.hpp
 VampAlsaHost.o: VampAlsaHost.hpp Pollable.hpp AlsaMinder.hpp PluginRunner.hpp
-VampAlsaHost.o: ParamSet.hpp TCPConnection.hpp
+VampAlsaHost.o: ParamSet.hpp WavFileWriter.hpp
 vamp-alsa-host.o: ParamSet.hpp Pollable.hpp VampAlsaHost.hpp TCPListener.hpp
 vamp-alsa-host.o: TCPConnection.hpp PluginRunner.hpp AlsaMinder.hpp
+vamp-host.o: system.h
+WavFileWriter.o: WavFileWriter.hpp Pollable.hpp VampAlsaHost.hpp
 AlsaMinder.o: Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp ParamSet.hpp
-AlsaMinder.o: TCPConnection.hpp AlsaMinder.hpp
-PluginRunner.o: ParamSet.hpp Pollable.hpp VampAlsaHost.hpp TCPConnection.hpp
-PluginRunner.o: AlsaMinder.hpp PluginRunner.hpp
+AlsaMinder.o: AlsaMinder.hpp
+PluginRunner.o: ParamSet.hpp Pollable.hpp VampAlsaHost.hpp AlsaMinder.hpp
+PluginRunner.o: PluginRunner.hpp
 Pollable.o: VampAlsaHost.hpp
 TCPConnection.o: Pollable.hpp VampAlsaHost.hpp
 TCPListener.o: Pollable.hpp VampAlsaHost.hpp
+WavFileWriter.o: Pollable.hpp VampAlsaHost.hpp

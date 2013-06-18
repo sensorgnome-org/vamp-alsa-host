@@ -14,10 +14,9 @@ using namespace std;
 
 #include "Pollable.hpp"
 #include "PluginRunner.hpp"
-#include "RawListener.hpp"
 
-typedef std::map < string, std::weak_ptr < RawListener > > RawListenerSet;
-typedef std::map < PluginRunner *, std::weak_ptr < PluginRunner > > PluginRunnerSet;
+typedef std::map < string, std::weak_ptr < Pollable > > RawListenerSet;
+typedef std::map < string, std::weak_ptr < PluginRunner > > PluginRunnerSet;
 
 class AlsaMinder : public Pollable {
 public:
@@ -70,13 +69,13 @@ protected:
 public:
 
   int open();
-  void addPluginRunner(std::shared_ptr < PluginRunner > pr);
-  void removePluginRunner(std::shared_ptr < PluginRunner > pr);
-  void addRawListener(string label, unsigned long long framesBetweenTimestamps, int downSampleFactor);
-  void removeRawListener(string label);
+  void addPluginRunner(std::string &label, std::shared_ptr < PluginRunner > pr);
+  void removePluginRunner(std::string &label);
+  void addRawListener(string &label, int downSampleFactor);
+  void removeRawListener(string &label);
   void removeAllRawListeners();
 
-  AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, VampAlsaHost * host);
+  AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now);
 
   ~AlsaMinder();
 
@@ -87,6 +86,8 @@ public:
   virtual int getNumPollFDs ();
 
   virtual int getPollFDs (struct pollfd *pollfds);
+
+  int getOutputFD(){return 0;}; 
 
   virtual void handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow);
   int start(double timeNow);

@@ -114,15 +114,14 @@ int PluginRunner::loadPlugin() {
   return 0;
 };
 
-PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int hwRate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps, VampAlsaHost *host):
-  Pollable (host, label),
+PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int hwRate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps):
+  Pollable (label),
   label(label),
   devLabel(devLabel),
   pluginSOName(pluginSOName),
   pluginID(pluginID),
   pluginOutput(pluginOutput),
   pluginParams(ps),
-  host(host),
   rate(rate),
   hwRate(hwRate),
   numChan(numChan),
@@ -158,7 +157,7 @@ PluginRunner::~PluginRunner() {
 
 bool PluginRunner::addOutputListener(string label) {
   
-  std::shared_ptr < OutputListener > outl = static_pointer_cast < OutputListener > (host->lookupByNameShared(label));
+  std::shared_ptr < Pollable > outl = static_pointer_cast < Pollable > (lookupByNameShared(label));
   if (outl) {
     outputListeners[label] = outl;
     return true;
@@ -276,7 +275,6 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
           ++io;
         } else {
           OutputListenerSet::iterator to_delete = io++;
-          // host->remove(to_delete->second);
           outputListeners.erase(to_delete);
         }
       }
@@ -310,11 +308,11 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
       // send output as text to any outputListeners
       for (OutputListenerSet::iterator io = outputListeners.begin(); io != outputListeners.end(); /**/) {
         if (auto ptr = (io->second).lock()) {
-          ptr->queueOutput(txt.str());
+          string output = txt.str();
+          ptr->queueOutput(output);
           ++io;
         } else {
           OutputListenerSet::iterator to_delete = io++;
-          //          host->remove(to_delete->second);
           outputListeners.erase(to_delete);
         }
       }

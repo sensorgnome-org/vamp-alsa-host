@@ -7,7 +7,7 @@ void AlsaMinder::delete_privates() {
     pcm = 0;
   }
   for (PluginRunnerSet::iterator ip = plugins.begin(); ip != plugins.end(); /**/) {
-    host->remove(ip->second);
+    Pollable::remove(ip->first);
     PluginRunnerSet::iterator del = ip++;
     plugins.erase(del);
   }
@@ -54,7 +54,7 @@ int AlsaMinder::open() {
 };
 
 void AlsaMinder::do_stop(double timeNow) {
-  host->requestPollFDRegen();
+  Pollable::requestPollFDRegen();
   if (pcm) {
     snd_pcm_drop(pcm);
     snd_pcm_close(pcm);
@@ -72,7 +72,7 @@ void AlsaMinder::stop(double timeNow) {
 int AlsaMinder::do_start(double timeNow) {
   if (!pcm && open())
     return 1;
-  host->requestPollFDRegen();
+  Pollable::requestPollFDRegen();
   snd_pcm_prepare(pcm);
   hasError = 0;
   snd_pcm_start(pcm);
@@ -89,29 +89,26 @@ int AlsaMinder::start(double timeNow) {
   return do_start(timeNow);
 };
 
-void AlsaMinder::addPluginRunner(std::shared_ptr < PluginRunner > pr) {
-  plugins[pr.get()] = pr;
+void AlsaMinder::addPluginRunner(std::string &label, std::shared_ptr < PluginRunner > pr) {
+  plugins[label] = pr;
 };
 
-void AlsaMinder::removePluginRunner(std::shared_ptr < PluginRunner > pr) {
+void AlsaMinder::removePluginRunner(std::string &label) {
   // remove plugin runner 
-  plugins.erase(pr.get());
+  plugins.erase(label);
 };
 
-void AlsaMinder::addRawListener(string label, int downSampleFactor) {
+void AlsaMinder::addRawListener(string &label, int downSampleFactor) {
   
-  std::shared_ptr < RawListener > rawl = static_pointer_cast < RawListener > (host->lookupByNameShared(label));
-  if (rawl) {
-    rawListeners[label] = rawl;
-    if (rawListeners.size() == 1) {
-      this->downSampleFactor = downSampleFactor;
-      downSampleCount = downSampleFactor;
-      downSampleAccum = 0;
-    }
+  rawListeners[label] = Pollable::lookupByNameShared(label);
+  if (rawListeners.size() == 1) {
+    this->downSampleFactor = downSampleFactor;
+    downSampleCount = downSampleFactor;
+    downSampleAccum = 0;
   }
 };
 
-void AlsaMinder::removeRawListener(string label) {
+void AlsaMinder::removeRawListener(string &label) {
   rawListeners.erase(label);
 };
 
@@ -119,8 +116,8 @@ void AlsaMinder::removeAllRawListeners() {
   rawListeners.clear();
 };
 
-AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now, VampAlsaHost *minder):
-  Pollable(minder, label),
+AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now):
+  Pollable(label),
   alsaDev(alsaDev),
   rate(rate),
   numChan(numChan),
@@ -206,7 +203,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
   if (revents & POLLERR) {
     hasError = errno;
     stopped = true;
-    host->requestPollFDRegen();
+    Pollable::requestPollFDRegen();
     stop(timeNow);
     if (start(timeNow)) {
       cerr << "{\"event\":\"devStalled\",\"devLabel\":\"" << label << "\",\"error\":\"poll return with POLLERR and errno=" << errno << "\"}" << endl;
@@ -315,8 +312,9 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
 
         for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
 
-          if (auto ptr = (ir->second.con).lock()) {
-            ptr->queueOutput((char *) rawSamples, downSampleAvail * 2, frameTimeStamp + downSampleAvail * (double) downSampleFactor / hwRate); // NB: hardcoded S16_LE sample size
+          if (auto ptr = (ir->second).lock()) {
+            double lastTimestamp = frameTimestamp + downSampleAvail * (double) downSampleFactor / hwRate;
+            ptr->queueOutput((char *) rawSamples, downSampleAvail * 2, &lastTimestamp ); // NB: hardcoded S16_LE sample size
             ++ir;
           } else {
             RawListenerSet::iterator to_delete = ir++;
@@ -373,7 +371,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
     lastDataReceived = timeNow; // wait before next restart
     stop(timeNow);
     start(timeNow);
-    host->requestPollFDRegen();
+    Pollable::requestPollFDRegen();
   }
 };
         

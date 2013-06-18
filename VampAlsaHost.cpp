@@ -7,150 +7,16 @@
 #include "Pollable.hpp"
 #include "AlsaMinder.hpp"
 #include "PluginRunner.hpp"
+#include "WavFileWriter.hpp"
 #include <time.h>
 
-VampAlsaHost::VampAlsaHost():
-  regen_pollfds(false),
-  have_deferrals(false),
-  doing_poll(false)
+VampAlsaHost::VampAlsaHost()
 {
 };
 
 VampAlsaHost::~VampAlsaHost() {
-  doing_poll = false;
 };
 
-void VampAlsaHost::add(std::shared_ptr < Pollable > p) {
-  auto pp = p.get();
-  if (!pp)
-    return;
-  if (! doing_poll) {
-    pollables[pp->label] = p;
-    regen_pollfds = true;
-  } else {
-    deferred_adds[pp->label] = p;
-    have_deferrals = true;
-  }
-}
-  
-void VampAlsaHost::remove(std::shared_ptr < Pollable > p) {
-  auto pp = p.get();
-  if (!pp)
-    return;
-
-  if (! doing_poll) {
-    pollables.erase(pp->label);
-    regen_pollfds = true;
-  } else {
-    deferred_removes[pp->label] = p;
-    have_deferrals = true;
-  }
-}
-
-void VampAlsaHost::remove(std::weak_ptr < Pollable > p) {
-  remove(p.lock());
-};
-
-void VampAlsaHost::remove(Pollable * p) {
-  remove(pollables[p->label]);
-};
-
-void VampAlsaHost::remove(std::string& label) {
-  remove(pollables[label]);
-};
-
-Pollable * VampAlsaHost::lookupByName (std::string& label) {
-  if (pollables.count(label) == 0)
-    return 0;
-  return pollables[label].get();
-};
-
-std::shared_ptr < Pollable > VampAlsaHost::lookupByNameShared (std::string& label) {
-  if (pollables.count(label) == 0)
-    return std::shared_ptr < Pollable > ((Pollable *) 0);
-  return pollables[label];
-};
-
-short& VampAlsaHost::eventsOf(Pollable *p, int offset) {
-
-  // return a reference to the events field for a Pollable.
-  // For Pollables with more than one FD, offset can be used
-  // to select among them.
-  return pollfds[p->indexInPollFD + offset].events;
-};
-
-void VampAlsaHost::requestPollFDRegen() {
-  regen_pollfds = true;
-};
-
-int VampAlsaHost::poll(int timeout) {
-  doing_poll = true;
-
-  regenFDs();
-  int rv = ::poll(& pollfds[0], pollfds.size(), timeout);
-  if (rv < 0) {
-    doing_poll = false;
-    std::cerr << "poll returned error - vamp-alsa-host" << std::endl;
-    return errno;
-  }
-
-  bool timedOut = rv == 0;
-  // handle events for each pollable.  We give each pollable the chance 
-  // to deal with timeouts, by passing that along.
-
-  for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
-    auto ptr = is->second.get();
-    if (!ptr)
-      continue;
-    int i = ptr->indexInPollFD;
-    if (i < 0)
-      continue;
-    ptr->handleEvents(&pollfds[i], timedOut, now());
-  }
-  doing_poll = false;
-  doDeferrals();
-  return 0;
-};
-
-void VampAlsaHost::doDeferrals() {
-  if (! have_deferrals)
-    return;
-  have_deferrals = false;
-  regen_pollfds = true;
-  for (PollableSet::iterator is = deferred_removes.begin(); is != deferred_removes.end(); ++is) 
-    pollables.erase(is->first);
-  deferred_removes.clear();
-  for (PollableSet::iterator is = deferred_adds.begin(); is != deferred_adds.end(); ++is) 
-    pollables[is->first] = is->second;
-  deferred_adds.clear();
-};
-    
-void VampAlsaHost::regenFDs() {
-  if (regen_pollfds) {
-    regen_pollfds = false;
-    pollfds.clear();
-    for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); /**/) {
-      if (auto ptr = is->second.get()) {
-        if (!ptr)
-          continue;
-        int where = pollfds.size();
-        int numFDs = ptr->getNumPollFDs();
-        if (numFDs > 0) {
-          ptr->indexInPollFD = where;
-          pollfds.resize(where + numFDs);
-          ptr->getPollFDs(& pollfds[where]);
-        } else {
-          ptr->indexInPollFD = -1;
-        }
-        ++is;
-      } else {
-        auto to_delete = is;
-        ++is;
-        pollables.erase(to_delete->first);
-      }
-    }
-  }
-}
 
 string VampAlsaHost::runCommand(string cmdString, string connLabel) {
   ostringstream reply;
@@ -164,29 +30,29 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     struct timespec t;
     t.tv_sec = 0;
     t.tv_nsec = 50 * 1000 * 1000;
-    for (PollableSet::iterator ips = pollables.begin(); ips != pollables.end(); ++ips) {
+    for (PollableSet::iterator ips = Pollable::pollables.begin(); ips != Pollable::pollables.end(); ++ips) {
       ips->second->stop(realTimeNow);
       // sleep 50 ms between stops
       nanosleep(&t, 0);
     }
     nanosleep (&t, 0);
     reply << "{\"message\":\"All devices stopped.\"}\n";
-    requestPollFDRegen();
+    Pollable::requestPollFDRegen();
   } else if (word == "startAll") {
     struct timespec t;
     t.tv_sec = 0;
-    t.tv_nsec = 500 * 1000 * 1000;
-    for (PollableSet::iterator ips = pollables.begin(); ips != pollables.end(); ++ips) {
+    t.tv_nsec = 100 * 1000 * 1000;
+    for (PollableSet::iterator ips = Pollable::pollables.begin(); ips != Pollable::pollables.end(); ++ips) {
       ips->second->start(realTimeNow);
-      // sleep 500 ms between starts
+      // sleep 100 ms between starts
       nanosleep(&t, 0);
     }
     reply << "{\"message\":\"All devices started.\"}\n";
-    requestPollFDRegen();
+    Pollable::requestPollFDRegen();
   } else if (word == "status") {
     string label;
     cmd >> label;
-    Pollable *p = lookupByName(label);
+    Pollable *p = Pollable::lookupByName(label);
     if (p) {
       reply << p->toJSON() << '\n';
     } else {
@@ -194,8 +60,8 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     }
   } else if (word == "list") {
     reply << "{";
-    int i = pollables.size();
-    for (PollableSet::iterator ips = pollables.begin(); ips != pollables.end(); ++ips, --i) {
+    int i = Pollable::pollables.size();
+    for (PollableSet::iterator ips = Pollable::pollables.begin(); ips != Pollable::pollables.end(); ++ips, --i) {
       reply << "\"" << ips->second->label << "\":" << ips->second->toJSON() << (i > 1 ? "," : "");
     }
     reply << "}\n";
@@ -203,31 +69,46 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     string label;
     cmd >> label;
     bool doStop = word == "stop";
-    Pollable *p = lookupByName(label);
+    Pollable *p = Pollable::lookupByName(label);
     if (p) {
       if (doStop)
         p->stop(realTimeNow);
       else
         p->start(realTimeNow);
       reply << p->toJSON() << '\n';
-      requestPollFDRegen();
+      Pollable::requestPollFDRegen();
     } else {
       reply << "{\"error\": \"Error: '" << label << "' does not specify a known open device\"}\n";
     }
-  } else if (word == "rawOn" || word == "rawOff" || word == "rawNone") {
+  } else if (word.substr(0, 3) == "raw") {
     string label;
     cmd >> label;
-    unsigned long long framesBetweenTimestamps = 0;
-    cmd >> framesBetweenTimestamps;
+    unsigned rate = 0;
+    cmd >> rate;
+    uint32_t frames = 0;
+    cmd >> frames;
+    int wav_header = 0;
+    cmd >> wav_header;
+    char path_template [MAX_CMD_STRING_LENGTH + 1];
+    path_template[0] = 0;
+    cmd.getline(path_template, MAX_CMD_STRING_LENGTH);
+    
 
-    AlsaMinder *p = dynamic_cast < AlsaMinder * > (lookupByName(label));
+    AlsaMinder *p = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(label));
     if (p) {
-      if (word == "rawOn") {
-        // raw listeners always get mono sound at 48 kHz
-        p->addRawListener(connLabel, framesBetweenTimestamps, p->hwRate / 48000);
-      } else if (word == "rawOff") {
+      if (word == "rawStream") {
+        p->addRawListener(connLabel, round(p->hwRate / rate));
+      } else if (word == "rawStreamOff") {
         p->removeRawListener(connLabel);
-      } else {
+      } else if (word == "rawFile" || word == "rawFileOff") {
+        std::string wavLabel = label + "_FileWriter";
+        if (word == "rawFile") {
+          WavFileWriter wav(connLabel, wavLabel, path_template, frames, rate);
+          p->addRawListener(wavLabel, round(p->hwRate / rate));
+        } else {
+          p->removeRawListener(wavLabel);
+        }
+      } else if (word == "rawNone") {
         p->removeAllRawListeners();
       }
     } else {
@@ -236,7 +117,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
   } else if (word == "fmOn" || word == "fmOff") {
     string label;
     cmd >> label;
-    AlsaMinder *p = dynamic_cast < AlsaMinder * > (lookupByName(label));
+    AlsaMinder *p = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(label));
     if (p) {
       p->setDemodFMForRaw(word == "fmOn");
     } else {
@@ -247,8 +128,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     int rate, numChan;
     cmd >> label >> alsaDev >> rate >> numChan;
     try {
-      std::shared_ptr < AlsaMinder > ptr = std::make_shared < AlsaMinder > (alsaDev, rate, numChan, label, realTimeNow, this);
-      add(ptr);
+      std::shared_ptr < AlsaMinder > ptr = std::make_shared < AlsaMinder > (alsaDev, rate, numChan, label, realTimeNow);
       reply << ptr->toJSON() << '\n';
     } catch (std::runtime_error e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
@@ -256,15 +136,15 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
   } else if (word == "close") {
     string label;
     cmd >> label;
-    AlsaMinder *dev = dynamic_cast < AlsaMinder * > (lookupByName(label));
+    AlsaMinder *dev = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(label));
     if (dev) {
       dev->stop(realTimeNow);
       reply << dev->toJSON() << '\n';
-      remove(label);
+      Pollable::remove(label);
     } else {
       reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}\n";
     }
-    requestPollFDRegen();
+    Pollable::requestPollFDRegen();
   } else if (word == "attach") {
     string devLabel, pluginLabel, pluginLib, pluginName, outputName;
     string par;
@@ -277,14 +157,13 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       ps[par] = val;
     }
     try {
-      AlsaMinder *dev = dynamic_cast < AlsaMinder * > (lookupByName(devLabel));
+      AlsaMinder *dev = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(devLabel));
       if (!dev)
         throw std::runtime_error(string("There is no device with label '") + devLabel + "'");
-      if (lookupByName(pluginLabel))
+      if (Pollable::lookupByName(pluginLabel))
         throw std::runtime_error(string("There is already a device or plugin with label '") + pluginLabel + "'");
-      std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, dev->rate, dev->hwRate, dev->numChan, pluginLib, pluginName, outputName, ps, this);
-      pollables[pluginLabel] = static_pointer_cast < Pollable > (plugin);
-      dev->addPluginRunner(plugin);
+      std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, dev->rate, dev->hwRate, dev->numChan, pluginLib, pluginName, outputName, ps);
+      dev->addPluginRunner(pluginLabel, plugin);
       if (! plugin->addOutputListener(defaultOutputListener))
         // the default output listener doesn't seem to exist any longer
         // so reset its name in case a subsequent connection has the same label
@@ -305,8 +184,8 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       ps[par] = val;
     }
     try {
-      PollableSet::iterator ip = pollables.find(pluginLabel);
-      if (ip == pollables.end())
+      PollableSet::iterator ip = Pollable::pollables.find(pluginLabel);
+      if (ip == Pollable::pollables.end())
         throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
       std::shared_ptr < PluginRunner > p = dynamic_pointer_cast < PluginRunner > (ip->second);
       auto ptr = p.get();
@@ -319,10 +198,10 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     string pluginLabel;
     cmd >> pluginLabel;
     try {
-      PollableSet::iterator ip = pollables.find(pluginLabel);
-      if (ip == pollables.end())
+      PollableSet::iterator ip = Pollable::pollables.find(pluginLabel);
+      if (ip == Pollable::pollables.end())
         throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
-      pollables.erase(ip);
+      Pollable::pollables.erase(ip);
       reply << "{\"message\": \"Plugin " << pluginLabel << " has been detached.\"}\n";
     } catch (std::runtime_error e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
@@ -331,8 +210,8 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     string pluginLabel;
     cmd >> pluginLabel;
     try {
-      PollableSet::iterator ip = pollables.find(pluginLabel);
-      if (ip == pollables.end())
+      PollableSet::iterator ip = Pollable::pollables.find(pluginLabel);
+      if (ip == Pollable::pollables.end())
         throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
       std::shared_ptr < PluginRunner > p = dynamic_pointer_cast < PluginRunner > (ip->second);
       auto ptr = p.get();
@@ -342,7 +221,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
     };
   } else if (word == "receiveAll") {
-    for (PollableSet::iterator ip = pollables.begin(); ip != pollables.end(); ++ip) {
+    for (PollableSet::iterator ip = Pollable::pollables.begin(); ip != Pollable::pollables.end(); ++ip) {
       std::shared_ptr < PluginRunner > p = dynamic_pointer_cast < PluginRunner > (ip->second);
       auto ptr = p.get();
       if (ptr)
@@ -365,7 +244,7 @@ int VampAlsaHost::run()
 {
   int rv;
   do {
-    rv = poll(2000); // 2 second timeout
+    rv = Pollable::poll(2000); // 2 second timeout
   } while (! rv);
   return rv;
 }
@@ -439,29 +318,56 @@ VampAlsaHost::commandHelp =
           "          is issued from a different TCP connection.  This command does not affect any existing\n"
           "          connections already receiving data from an attached plugin.\n"
           "          Note: this command does not return a reply unless there is an error.\n\n"
+  
+          "       rawStream DEV_LABEL RATE FRAMES WITH_WAV_HEADER\n"
+          "          Write raw data to the TCP connection.\n"
+          "          DEV_LABEL: the device from which to obtain raw data\n"
+          "          RATE:   the frame rate to use.  The actual frame rate will be the closest frame rate which\n"
+          "                  divides evenly into the hardware frame rate.\n"
+          "          FRAMES: the number of frames to write.  After the last frame is written, VAH will print a\n"
+          "                  message of the form {\"message\": \"rawDone\", \"dev\": \"DEV_LABEL\"} to the TCP connection\n"
+          "                  which issued the rawFile command.\n"
+          "          WITH_WAV_HEADER: if non-zero, indicates a .WAV file header will be written\n"
+          "                  to the file before the sample data.\n\n"
+          "          If an error occurs when writing to a file, VAH will print a message of the form\n"
+          "                  {\"message\": \"rawError\", \"dev\": \"DEV_LABEL\", \"errno\": errno} to the TCP connection\n"
 
-          "       rawOn DEV_LABEL [FRAMES_BETWEEN_TIMESTAMPS]\n"
-          "          Raw data from the device DEV_LABEL will be sent to the issuing TCP connection\n"
-          "          once the device is started, independently of any plugin processing.\n\n"
-          "          FRAMES_BETWEEN_TIMESTAMPS: if specified, vamp-alsa-host will emit timestamps\n"
-          "          to the raw output stream.  Each timestamp is an 8-byte double (little-endian)\n"
-          "          giving the precise timestamp of the frame which immediately follows.\n"
-          "          A timestamp is emitted at the start of the raw stream, and then after each\n"
-          "          sequence of FRAMES_BETWEEN_TIMESTAMPS frames.\n\n"
-          "          Note: this command does not return a reply unless there is an error.\n"
-    
-          "       rawOff DEV_LABEL\n"
-          "          Stop sending raw data from the device DEV_LABEL to the issuing TCP connection.\n\n"
-          "          Note: this command does not return a reply unless there is an error.\n"
+          "       rawFile DEV_LABEL RATE FRAMES WITH_WAV_HEADER PATH_TEMPLATE\n"
+          "          Write queued raw data to a file or the TCP connection.\n"
+          "          DEV_LABEL: the device from which to obtain raw data; nothing is written until a rawOn\n"
+          "                  command has been issued for this device.\n"
+          "          RATE:   the frame rate to use.  The actual frame rate will be the closest frame rate which\n"
+          "                  divides evenly into the hardware frame rate.\n"
+          "          FRAMES: the number of frames to write.  After the last frame is written, VAH will print a\n"
+          "                  message of the form {\"message\": \"rawDone\", \"dev\": \"DEV_LABEL\"} to the TCP connection\n"
+          "                  which issued the rawFile command.\nRaw data will continue to be buffered so that a\n"
+          "                  subsequent rawFile command can direct data to a new file without dropping frames.\n"
+          "                  If a file is already being written from DEV_LABEL, this command closes that file.\n"
+          "                  and immediately begins writing to the new file.\n"
+          "          WITH_WAV_HEADER: if non-zero, indicates a .WAV file header will be written\n"
+          "                  to the file before the sample data.\n\n"
+          "          PATH_TEMPLATE: the template for a full pathname of the file to write; strftime format codes\n"
+          "                  will be replaced by the real timestamp of the first frame written.\n"
+          "                  If not specified, data will be written directly to the TCP connection.\n\n"
+          "          If an error occurs when writing to a file, VAH will print a message of the form\n"
+          "                  {\"message\": \"rawError\", \"dev\": \"DEV_LABEL\", \"errno\": errno} to the TCP connection\n"
+
+          "       rawStreamOff DEV_LABEL\n"
+          "          Stop writing raw data from the device DEV_LABEL to the issuing TCP connection.\n"
+          "          Note: this command does not return a reply unless there is an error.\n\n"
+
+          "       rawFileOff DEV_LABEL\n"
+          "          Stop writing raw data from the device DEV_LABEL to a file, and stop queuing raw data.\n"
+          "          Note: this command does not return a reply unless there is an error.\n\n"
 
           "       rawNone DEV_LABEL\n"
-          "          Do not send raw data from the device DEV_LABEL to *any* TCP connections.\n"
+          "          Stop not send raw data from the device DEV_LABEL to *any* TCP connections.\n"
           "          Note: this command does not return a reply unless there is an error.\n\n"
-    
+
           "       fmOn DEV_LABEL\n"
           "          Specify that raw data from the device DEV_LABEL will be FM-demodulated\n"
-          "          before being sent to to any TCP connections which are listening to it via\n"
-          "          a rawOn command.  This does not change the data seen by plugins.\n"
+          "          before being sent to to any file or TCP connection which are listening to it via\n"
+          "          a rawFile command.  This does not change the data seen by plugins.\n"
           "          Also, this command does not by itself cause raw data to be emitted; you\n"
           "          must use rawOn command on a connection for this command to have any effect.\n"
           "          Finally, this command only has effect on a stereo device, and will reduce\n"
@@ -516,3 +422,5 @@ VampAlsaHost::commandHelp =
 
           "       quit\n"
           "           Close all open devices and quit the program.\n";
+
+std::string VampAlsaHost::defaultOutputListener;

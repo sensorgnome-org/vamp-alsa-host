@@ -6,7 +6,6 @@
 #include <string>
 #include <stdexcept>
 
-
 class OutputListener {
 public:
 

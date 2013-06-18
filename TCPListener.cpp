@@ -3,6 +3,15 @@
 #include <stdexcept>
 #include <fcntl.h>
 
+string TCPListener::toJSON() {
+  ostringstream s;
+  s << "{" 
+    << "\"type\":\"TCPListener\","
+    << "\"socket\":\"" << server_socket_name << "\""
+    << "}";
+  return s.str();
+}
+
 int TCPListener::getPollFDs (struct pollfd * pollfds) {
   * pollfds = pollfd;
   return 0;
@@ -19,14 +28,13 @@ void TCPListener::handleEvents (struct pollfd *pollfds, bool timedOut, double ti
       fcntl(conn_fd, F_SETFL, O_NONBLOCK);
       ostringstream label("Socket#", std::ios_base::app);
       label << conn_fd;
-      auto conn = std::make_shared < TCPConnection > (conn_fd, host, label.str(), quiet);
-      host->add(conn);
+      auto conn = std::make_shared < TCPConnection > (conn_fd, label.str(), & VampAlsaHost::runCommand, quiet, timeNow);
     }
   }
 };
 
-TCPListener::TCPListener(string server_socket_name, string label, VampAlsaHost *host, bool quiet) : 
-  Pollable(host, label),
+TCPListener::TCPListener(string server_socket_name, string label, bool quiet) : 
+  Pollable(label),
   server_socket_name(server_socket_name),
   quiet(quiet)
 {
@@ -48,19 +56,3 @@ TCPListener::TCPListener(string server_socket_name, string label, VampAlsaHost *
   std::cout.flush();
 };
 
-void TCPListener::stop(double timeNow) {
-  /* do nothing */
-};
-
-int TCPListener::start(double timeNow) {
-  return 0;
-};
-
-string TCPListener::toJSON() {
-  ostringstream s;
-  s << "{" 
-    << "\"type\":\"TCPListener\","
-    << "\"socket\":\"" << server_socket_name << "\""
-    << "}";
-  return s.str();
-}

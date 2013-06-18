@@ -9,35 +9,23 @@ using std::string;
 using std::istringstream;
 
 #include "Pollable.hpp"
-#include "RawListener.hpp"
+#include "VampAlsaHost.hpp"
 
 class TCPConnection;
 
-// type that handles commands
-typedef string (*CommandHandler) (string cmd, string connLabel);
-
 class TCPConnection : public Pollable {
-
-protected: 
-  struct pollfd pollfd;
-  static const unsigned MAX_CMD_STRING_LENGTH = 256;    // size of buffer for receiving commands over TCP
-
-  char cmdString[MAX_CMD_STRING_LENGTH + 1];    // buffer for input from TCP
-  string inputBuff;   // input from TCP socket which has not been processed yet
-
-  RawListener outputListener;
 
 public:
 
-  TCPConnection (int fd, VampAlsaHost *minder, string label, bool quiet);
+  string toJSON();
+
+  TCPConnection (int fd, string label, CommandHandler handler, bool quiet, double timeNow);
   
   int getNumPollFDs() { return 1;};
 
   int getPollFDs (struct pollfd * pollfds);
 
-  bool queueOutput(const char *p, int len, double lastTimestamp=0);
-
-  bool queueOutput(const std::string);
+  int getOutputFD();
     
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
@@ -45,7 +33,18 @@ public:
 
   int start(double timeNow);
 
-  string toJSON();
+  void setRawOutput(bool yesno);
+
+protected: 
+  CommandHandler handler;
+  static const unsigned RAW_OUTPUT_BUFFER_SIZE = 256;    // size of buffer for receiving commands over TCP
+
+  char cmdString[VampAlsaHost::MAX_CMD_STRING_LENGTH + 1];    // buffer for input from TCP
+  string inputBuff;   // input from TCP socket which has not been processed yet
+
+  std::weak_ptr < Pollable > outputListener;
+  double timeConnected;
+
 };
 
 #endif // TCPCONNECTION_HPP

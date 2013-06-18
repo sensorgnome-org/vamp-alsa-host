@@ -274,7 +274,8 @@ main(int argc, char **argv)
     ostringstream label("Socket:", ios_base::app);
     label << serverSocketName;
     host = new VampAlsaHost();
-    host->add (std::make_shared < TCPListener > (serverSocketName, label.str(), host, quiet));
+    std::shared_ptr < TCPListener > listener =  std::make_shared < TCPListener > (serverSocketName, label.str(), quiet);
+
     int rv = 0;
     try {
         rv = host->run();
