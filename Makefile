@@ -1,6 +1,5 @@
-CCOPTS_PRODUCTION :=  -std=c++0x -I. -O3 -Wall -fPIC -ftree-vectorize -ffast-math  
-
-CCOPTS_DEBUG :=  -std=c++0x -I. -g3 -Wall -fPIC -ftree-vectorize -ffast-math
+CCOPTS_PRODUCTION := -I. -O3 -Wall -fPIC -ftree-vectorize -ffast-math  
+CCOPTS_DEBUG      := -I. -g3 -Wall -fPIC -ftree-vectorize -ffast-math
 
 CCOPTS := $(CCOPTS_PRODUCTION)
 #CCOPTS := $(CCOPTS_DEBUG)

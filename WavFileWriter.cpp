@@ -3,11 +3,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
+#include <math.h>
+#include <stdio.h>
 
 WavFileWriter::WavFileWriter (string &connLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate) :
   Pollable(label),
   connLabel(connLabel),
-  outputBuffer(OUTPUT_BUFFER_SIZE),
   pathTemplate(pathTemplate),
   framesToWrite(framesToWrite),
   bytesToWrite(framesToWrite * 2), // FIXME: mono S16_LE hardcoded here
@@ -19,6 +20,7 @@ WavFileWriter::WavFileWriter (string &connLabel, string &label, char *pathTempla
   pollfd.fd = -1;
   pollfd.events = 0;
   fillWaveFileHeader(rate, 1, framesToWrite); // FIXME: mono S16_LE hardcoded here
+  outputBuffer = boost::circular_buffer < char > (OUTPUT_BUFFER_SIZE);
 };
 
 int WavFileWriter::getNumPollFDs() {
@@ -30,11 +32,11 @@ int WavFileWriter::getPollFDs (struct pollfd * pollfds) {
   return 0;
 };
 
-bool WavFileWriter::queueOutput(const char *p, int len, void * meta) {
+bool WavFileWriter::queueOutput(const char *p, uint32_t len, void * meta) {
   // if we've already opened a file, drop samples that would overflow the
   // buffer
   if (timestampCaptured) {
-    len = std::min((int) outputBuffer.reserve(), len);
+    len = std::min((int) outputBuffer.reserve(), (int) len);
   }
 
   if (len == 0)
@@ -58,12 +60,11 @@ void WavFileWriter::openOutputFile(double first_timestamp) {
   timestampCaptured = true;
 
   // format the timestamp into the filename with 0.1 ms precision
-  char filename[1024];
   time_t tt = floor(first_timestamp);
-  int extra_4_digits = round((first_timestamp - tt) * 1.0e4);
+  int extra_6_digits = round((first_timestamp - tt) * 1.0e6);
   char ts[32];
-  int nn = strftime(ts, 31, "%Y-%m-%dT%H-%M-%S", gmtime(&tt));
-  sprintf(&ts[nn], "%04d", extra_4_digits);
+  int nn = strftime(ts, 31, "%Y-%m-%dT%H-%M-%S.", gmtime(&tt));
+  sprintf(&ts[nn], "%06d", extra_6_digits);
   snprintf(filename, 1023, pathTemplate.c_str(), ts);
 
   pollfd.fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOATIME | O_NONBLOCK , S_IRWXU | S_IRWXG);
@@ -131,8 +132,11 @@ int WavFileWriter::start(double timeNow) {
 string WavFileWriter::toJSON() {
   ostringstream s;
   s << "{" 
-    << "\"type\":\"WavFileWriter\","
-    << "\"fileDescriptor\":" << pollfd.fd
+    << "\"type\":\"WavFileWriter\""
+    << ",\"fileDescriptor\":" << pollfd.fd
+    << ",\"fileName\":\"" << (char *) filename
+    << "\",\"framesWritten\":" << (uint32_t) ((bytesToWrite - byteCountdown) / 2)
+    << ",\"secondsWritten\":" << ((bytesToWrite - byteCountdown) / (2.0 * rate))   
     << "}";
   return s.str();
 };
@@ -153,6 +157,6 @@ void WavFileWriter::fillWaveFileHeader (int rate, int numChan, uint32_t frames)
   hdr.byteRate = rate * numChan * 2;
   hdr.frameSize = numChan * 2;
   hdr.sampleSize = 16;
-  memcpy(hdr.DATAlabel, "DATA", 4);
+  memcpy(hdr.DATAlabel, "data", 4);
   hdr.remDataSize = bytes;
 };

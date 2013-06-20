@@ -17,7 +17,7 @@ using namespace Vamp::HostExt;
 #include "ParamSet.hpp"
 #include "Pollable.hpp"
 
-typedef std::map < string, std::weak_ptr < Pollable > > OutputListenerSet;
+typedef std::map < string, weak_ptr < Pollable > > OutputListenerSet;
 
 class AlsaMinder;
 
@@ -59,7 +59,7 @@ protected:
   OutputListenerSet     outputListeners;     // connections receiving output from this plugin, if any.
 
 public:
-  PluginRunner(string &label, string &devLabel, int rate, int hwRate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps);
+  PluginRunner(const string &label, const string &devLabel, int rate, int hwRate, int numChan, const string &pluginSOName, const string &pluginID, const string &pluginOutput, const ParamSet &ps);
   ~PluginRunner();
 
   bool addOutputListener(string connLabel);

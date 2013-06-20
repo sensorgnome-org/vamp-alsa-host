@@ -114,7 +114,7 @@ int PluginRunner::loadPlugin() {
   return 0;
 };
 
-PluginRunner::PluginRunner(string &label, string &devLabel, int rate, int hwRate, int numChan, string &pluginSOName, string &pluginID, string &pluginOutput, ParamSet &ps):
+PluginRunner::PluginRunner(const string &label, const string &devLabel, int rate, int hwRate, int numChan, const string &pluginSOName, const string &pluginID, const string &pluginOutput, const ParamSet &ps):
   Pollable (label),
   label(label),
   devLabel(devLabel),
@@ -157,7 +157,7 @@ PluginRunner::~PluginRunner() {
 
 bool PluginRunner::addOutputListener(string label) {
   
-  std::shared_ptr < Pollable > outl = static_pointer_cast < Pollable > (lookupByNameShared(label));
+  shared_ptr < Pollable > outl = boost::static_pointer_cast < Pollable > (lookupByNameShared(label));
   if (outl) {
     outputListeners[label] = outl;
     return true;
@@ -270,7 +270,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
     if (isOutputBinary) {
       // copy values as raw bytes to any outputListeners
       for (OutputListenerSet::iterator io = outputListeners.begin(); io != outputListeners.end(); /**/) {
-        if (auto ptr = (io->second).lock()) {
+        if (shared_ptr < Pollable > ptr = (io->second).lock()) {
           ptr->queueOutput((char *)& f->values[0], f->values.size() * sizeof(f->values[0]));
           ++io;
         } else {
@@ -307,7 +307,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
 
       // send output as text to any outputListeners
       for (OutputListenerSet::iterator io = outputListeners.begin(); io != outputListeners.end(); /**/) {
-        if (auto ptr = (io->second).lock()) {
+        if (shared_ptr < Pollable > ptr = (io->second).lock()) {
           string output = txt.str();
           ptr->queueOutput(output);
           ++io;

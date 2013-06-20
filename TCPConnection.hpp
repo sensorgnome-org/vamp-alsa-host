@@ -21,7 +21,7 @@ public:
 
   TCPConnection (int fd, string label, CommandHandler handler, bool quiet, double timeNow);
   
-  int getNumPollFDs() { return 1;};
+  int getNumPollFDs();
 
   int getPollFDs (struct pollfd * pollfds);
 
@@ -35,14 +35,16 @@ public:
 
   void setRawOutput(bool yesno);
 
+  static const int RAW_OUTPUT_BUFFER_SIZE = 256;    // size of buffer for receiving commands over TCP
+
 protected: 
   CommandHandler handler;
-  static const unsigned RAW_OUTPUT_BUFFER_SIZE = 256;    // size of buffer for receiving commands over TCP
+
 
   char cmdString[VampAlsaHost::MAX_CMD_STRING_LENGTH + 1];    // buffer for input from TCP
   string inputBuff;   // input from TCP socket which has not been processed yet
 
-  std::weak_ptr < Pollable > outputListener;
+  weak_ptr < Pollable > outputListener;
   double timeConnected;
 
 };

@@ -32,7 +32,7 @@ protected:
   string connLabel; // label of TCP connection controlling us; we send it error and done messages
   static const unsigned OUTPUT_BUFFER_SIZE = 16777216; // 16 M output buffer
 
-  boost::circular_buffer < char > outputBuffer;  // output data waiting to be written to file
+  //  boost::circular_buffer < char > outputBuffer;  // output data waiting to be written to file
   string pathTemplate; // template of full path to output file, with %s replaced by date/time of first sample
   int32_t framesToWrite; // number of frames to write to file
   int32_t bytesToWrite;  // number of bytes to write to file
@@ -43,6 +43,9 @@ protected:
   bool timestampCaptured; // has the timestamp for the filename been captured?  If so, don't allow the start of
   // the buffer to be overwritten - we want to guarantee the timestamp is correct for the first frame, and for
   // a buffer's worth of data
+
+  char filename[1024]; // most recently opened file
+
   void fillWaveFileHeader (int rate, int numChan, uint32_t frames); // fill the .WAV file header 
 
   void openOutputFile(double firstTimestamp);
@@ -58,7 +61,7 @@ public:
 
   int getOutputFD(){return 0;}; 
 
-  bool queueOutput(const char *p, int len, void * meta = 0);
+  bool queueOutput(const char *p, uint32_t len, void * meta = 0);
     
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 

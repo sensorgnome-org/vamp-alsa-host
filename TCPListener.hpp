@@ -25,7 +25,7 @@ class TCPListener : public Pollable {
 
   bool queueOutput (const char * p, uint32_t len, void * meta = 0) {return true;};
 
-  int getNumPollFDs() { return 1;};
+  int getNumPollFDs();
                       // return number of fds used by this Pollable (negative means error)
 
   int getPollFDs (struct pollfd * pollfds);

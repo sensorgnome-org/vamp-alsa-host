@@ -1,17 +1,22 @@
 #include "Pollable.hpp"
 #include <stdint.h>
 
-Pollable::Pollable(std::string& label) : 
+Pollable::Pollable(const std::string& label) : 
   label(label), 
   outputBuffer(DEFAULT_OUTPUT_BUFFER_SIZE)
 {
-  pollables[label] = std::shared_ptr < Pollable > (this);
+  pollables[label] = shared_ptr < Pollable > (this);
+  regen_pollfds = true;
 };
   
+Pollable::~Pollable() {
+  std::cout << "About to destroy Pollable with label " << label << std::endl;
+};
+
 void 
 Pollable::remove(const std::string& label) {
-  auto p = pollables[label];
-  auto pp = p.get();
+  shared_ptr < Pollable >  p = pollables[label];
+  Pollable * pp = p.get();
   if (!pp)
     return;
   if (! doing_poll) {
@@ -30,10 +35,10 @@ Pollable::lookupByName (const std::string& label) {
   return pollables[label].get();
 };
 
-std::shared_ptr < Pollable > 
+shared_ptr < Pollable > 
 Pollable::lookupByNameShared (const std::string& label) {
   if (pollables.count(label) == 0)
-    return std::shared_ptr < Pollable > ((Pollable *) 0);
+    return shared_ptr < Pollable > ((Pollable *) 0);
   return pollables[label];
 };
 
@@ -43,7 +48,7 @@ Pollable::eventsOf(int offset) {
   // return a reference to the events field for a Pollable.
   // For Pollables with more than one FD, offset can be used
   // to select among them.
-  return pollfds[indexInPollFD + offset].events;
+  return allpollfds[indexInPollFD + offset].events;
 };
 
 void 
@@ -56,7 +61,7 @@ Pollable::poll(int timeout) {
   doing_poll = true;
 
   regenFDs();
-  int rv = ::poll(& pollfds[0], pollfds.size(), timeout);
+  int rv = ::poll(& allpollfds[0], allpollfds.size(), timeout);
   if (rv < 0) {
     doing_poll = false;
     std::cerr << "poll returned error - vamp-alsa-host" << std::endl;
@@ -68,13 +73,13 @@ Pollable::poll(int timeout) {
   // to deal with timeouts, by passing that along.
 
   for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
-    auto ptr = is->second.get();
+    Pollable * ptr = is->second.get();
     if (!ptr)
       continue;
     int i = ptr->indexInPollFD;
     if (i < 0)
       continue;
-    ptr->handleEvents(&pollfds[i], timedOut, VampAlsaHost::now());
+    ptr->handleEvents(&allpollfds[i], timedOut, VampAlsaHost::now());
   }
   doing_poll = false;
   doDeferrals();
@@ -96,23 +101,23 @@ void
 Pollable::regenFDs() {
   if (regen_pollfds) {
     regen_pollfds = false;
-    pollfds.clear();
+    allpollfds.clear();
     for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); /**/) {
-      if (auto ptr = is->second.get()) {
+      if (Pollable * ptr = is->second.get()) {
         if (!ptr)
           continue;
-        int where = pollfds.size();
+        int where = allpollfds.size();
         int numFDs = ptr->getNumPollFDs();
         if (numFDs > 0) {
           ptr->indexInPollFD = where;
-          pollfds.resize(where + numFDs);
-          ptr->getPollFDs(& pollfds[where]);
+          allpollfds.resize(where + numFDs);
+          ptr->getPollFDs(& allpollfds[where]);
         } else {
           ptr->indexInPollFD = -1;
         }
         ++is;
       } else {
-        auto to_delete = is;
+        PollableSet::iterator to_delete = is;
         ++is;
         pollables.erase(to_delete->first);
       }
@@ -147,7 +152,7 @@ Pollable::writeSomeOutput (int maxBytes) {
     // which is now in the second array but which will eventually be in the first array.
     boost::circular_buffer < char > ::array_range aone = outputBuffer.array_one();
     toWrite = std::min(toWrite, (int)aone.second);
-    int num_bytes = write(pollfd.fd, (char *) aone.first, aone.second);
+    int num_bytes = write(pollfd.fd, (char *) aone.first, toWrite);
     if (num_bytes < 0) {
       // error writing, call the error callback
       pollfd.events &= ~POLLOUT;
@@ -168,7 +173,7 @@ Pollable::writeSomeOutput (int maxBytes) {
 };
 
 // static initializers
-std::vector < struct pollfd > Pollable::pollfds(5);
+std::vector < struct pollfd > Pollable::allpollfds(5);
 PollableSet Pollable::pollables;
 PollableSet Pollable::deferred_removes;
 bool Pollable::regen_pollfds = true;

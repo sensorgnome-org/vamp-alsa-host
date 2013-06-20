@@ -15,8 +15,8 @@ using namespace std;
 #include "Pollable.hpp"
 #include "PluginRunner.hpp"
 
-typedef std::map < string, std::weak_ptr < Pollable > > RawListenerSet;
-typedef std::map < string, std::weak_ptr < PluginRunner > > PluginRunnerSet;
+typedef std::map < string, weak_ptr < Pollable > > RawListenerSet;
+typedef std::map < string, weak_ptr < PluginRunner > > PluginRunnerSet;
 
 class AlsaMinder : public Pollable {
 public:
@@ -69,13 +69,13 @@ protected:
 public:
 
   int open();
-  void addPluginRunner(std::string &label, std::shared_ptr < PluginRunner > pr);
+  void addPluginRunner(std::string &label, shared_ptr < PluginRunner > pr);
   void removePluginRunner(std::string &label);
   void addRawListener(string &label, int downSampleFactor);
   void removeRawListener(string &label);
   void removeAllRawListeners();
 
-  AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now);
+  AlsaMinder(const string &alsaDev, int rate, unsigned int numChan, const string &label, double now);
 
   ~AlsaMinder();
 

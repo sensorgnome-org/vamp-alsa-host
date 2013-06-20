@@ -91,9 +91,9 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     cmd >> wav_header;
     char path_template [MAX_CMD_STRING_LENGTH + 1];
     path_template[0] = 0;
-    cmd.getline(path_template, MAX_CMD_STRING_LENGTH);
-    
-
+    cmd.ignore(MAX_CMD_STRING_LENGTH, '"');
+    cmd.getline(path_template, MAX_CMD_STRING_LENGTH, '"');
+   
     AlsaMinder *p = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(label));
     if (p) {
       if (word == "rawStream") {
@@ -103,8 +103,12 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       } else if (word == "rawFile" || word == "rawFileOff") {
         std::string wavLabel = label + "_FileWriter";
         if (word == "rawFile") {
-          WavFileWriter wav(connLabel, wavLabel, path_template, frames, rate);
-          p->addRawListener(wavLabel, round(p->hwRate / rate));
+          if (strlen(path_template) == 0) {
+            reply << "{\"error\": \"Error: invalid path template - did you forget double quotes?\"}\n";
+          } else {
+            new WavFileWriter (connLabel, wavLabel, path_template, frames, rate);
+            p->addRawListener(wavLabel, round(p->hwRate / rate));
+          }
         } else {
           p->removeRawListener(wavLabel);
         }
@@ -128,7 +132,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     int rate, numChan;
     cmd >> label >> alsaDev >> rate >> numChan;
     try {
-      std::shared_ptr < AlsaMinder > ptr = std::make_shared < AlsaMinder > (alsaDev, rate, numChan, label, realTimeNow);
+      AlsaMinder * ptr = new AlsaMinder(alsaDev, rate, numChan, label, realTimeNow);
       reply << ptr->toJSON() << '\n';
     } catch (std::runtime_error e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
@@ -162,7 +166,8 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         throw std::runtime_error(string("There is no device with label '") + devLabel + "'");
       if (Pollable::lookupByName(pluginLabel))
         throw std::runtime_error(string("There is already a device or plugin with label '") + pluginLabel + "'");
-      std::shared_ptr < PluginRunner > plugin = std::make_shared < PluginRunner > (pluginLabel, devLabel, dev->rate, dev->hwRate, dev->numChan, pluginLib, pluginName, outputName, ps);
+      new PluginRunner(pluginLabel, devLabel, dev->rate, dev->hwRate, dev->numChan, pluginLib, pluginName, outputName, ps);
+      shared_ptr < PluginRunner > plugin = static_pointer_cast < PluginRunner > (Pollable::lookupByNameShared(pluginLabel));
       dev->addPluginRunner(pluginLabel, plugin);
       if (! plugin->addOutputListener(defaultOutputListener))
         // the default output listener doesn't seem to exist any longer
@@ -187,8 +192,8 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       PollableSet::iterator ip = Pollable::pollables.find(pluginLabel);
       if (ip == Pollable::pollables.end())
         throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
-      std::shared_ptr < PluginRunner > p = dynamic_pointer_cast < PluginRunner > (ip->second);
-      auto ptr = p.get();
+      shared_ptr < PluginRunner > p = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
+      PluginRunner * ptr = p.get();
       if (ptr)
         ptr->setParameters(ps);
     } catch (std::runtime_error e) {
@@ -213,8 +218,8 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       PollableSet::iterator ip = Pollable::pollables.find(pluginLabel);
       if (ip == Pollable::pollables.end())
         throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
-      std::shared_ptr < PluginRunner > p = dynamic_pointer_cast < PluginRunner > (ip->second);
-      auto ptr = p.get();
+      shared_ptr < PluginRunner > p = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
+      PluginRunner * ptr = p.get();
       if (ptr)
         ptr->addOutputListener(connLabel);
     } catch (std::runtime_error e) {
@@ -222,8 +227,8 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     };
   } else if (word == "receiveAll") {
     for (PollableSet::iterator ip = Pollable::pollables.begin(); ip != Pollable::pollables.end(); ++ip) {
-      std::shared_ptr < PluginRunner > p = dynamic_pointer_cast < PluginRunner > (ip->second);
-      auto ptr = p.get();
+      shared_ptr < PluginRunner > p = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
+      PluginRunner * ptr = p.get();
       if (ptr)
         ptr->addOutputListener(connLabel);
       defaultOutputListener = connLabel;

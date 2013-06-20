@@ -12,6 +12,10 @@ string TCPListener::toJSON() {
   return s.str();
 }
 
+int TCPListener::getNumPollFDs() {
+  return 1;
+};
+
 int TCPListener::getPollFDs (struct pollfd * pollfds) {
   * pollfds = pollfd;
   return 0;
@@ -28,7 +32,7 @@ void TCPListener::handleEvents (struct pollfd *pollfds, bool timedOut, double ti
       fcntl(conn_fd, F_SETFL, O_NONBLOCK);
       ostringstream label("Socket#", std::ios_base::app);
       label << conn_fd;
-      auto conn = std::make_shared < TCPConnection > (conn_fd, label.str(), & VampAlsaHost::runCommand, quiet, timeNow);
+      new TCPConnection (conn_fd, label.str(), & VampAlsaHost::runCommand, quiet, timeNow);
     }
   }
 };

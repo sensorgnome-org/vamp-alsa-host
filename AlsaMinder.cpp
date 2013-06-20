@@ -89,7 +89,7 @@ int AlsaMinder::start(double timeNow) {
   return do_start(timeNow);
 };
 
-void AlsaMinder::addPluginRunner(std::string &label, std::shared_ptr < PluginRunner > pr) {
+void AlsaMinder::addPluginRunner(std::string &label, shared_ptr < PluginRunner > pr) {
   plugins[label] = pr;
 };
 
@@ -116,7 +116,7 @@ void AlsaMinder::removeAllRawListeners() {
   rawListeners.clear();
 };
 
-AlsaMinder::AlsaMinder(string &alsaDev, int rate, unsigned int numChan, string &label, double now):
+AlsaMinder::AlsaMinder(const string &alsaDev, int rate, unsigned int numChan, const string &label, double now):
   Pollable(label),
   alsaDev(alsaDev),
   rate(rate),
@@ -312,7 +312,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
 
         for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
 
-          if (auto ptr = (ir->second).lock()) {
+          if (Pollable * ptr = (ir->second).lock().get()) {
             double lastTimestamp = frameTimestamp + downSampleAvail * (double) downSampleFactor / hwRate;
             ptr->queueOutput((char *) rawSamples, downSampleAvail * 2, &lastTimestamp ); // NB: hardcoded S16_LE sample size
             ++ir;
@@ -340,7 +340,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
           src1 += step * offset;
         }
 
-        if (auto ptr = (ip->second).lock()) {
+        if (boost::shared_ptr < PluginRunner > ptr = (ip->second).lock()) {
           ptr->handleData(avail, src0, src1, step, frameTimestamp);
           ++ip;
         } else {

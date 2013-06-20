@@ -1,11 +1,12 @@
 #include "TCPConnection.hpp"
+#include <iomanip>
 
 string TCPConnection::toJSON() {
   ostringstream s;
   s << "{" 
-    << "\"type\":\"TCPConnection\","
-    << "\"fileDescriptor\":" << pollfd.fd
-    << "\"timeConnected\":" << timeConnected
+    << "\"type\":\"TCPConnection\""
+    << ",\"fileDescriptor\":" << pollfd.fd
+    << ",\"timeConnected\":" << std::setprecision(14) << timeConnected
     << "}";
   return s.str();
 };
@@ -27,6 +28,10 @@ TCPConnection::TCPConnection (int fd, string label, CommandHandler handler, bool
   pollfd.events = POLLIN | POLLRDHUP;
   if (! quiet)
     queueOutput(msg);
+};
+
+int TCPConnection::getNumPollFDs() {
+  return 1;
 };
   
 int TCPConnection::getPollFDs (struct pollfd * pollfds) {
@@ -95,7 +100,7 @@ int TCPConnection::start(double timeNow) {
 };
 
 void TCPConnection::setRawOutput(bool yesno) {
-  unsigned capacity = yesno ? RAW_OUTPUT_BUFFER_SIZE : DEFAULT_OUTPUT_BUFFER_SIZE;
+  unsigned capacity = yesno ? TCPConnection::RAW_OUTPUT_BUFFER_SIZE : Pollable::DEFAULT_OUTPUT_BUFFER_SIZE;
   if( capacity != outputBuffer.capacity())
     outputBuffer = boost::circular_buffer < char > (capacity);
 };

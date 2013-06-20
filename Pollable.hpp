@@ -9,12 +9,21 @@
 
 #include <string>
 #include <stdexcept>
+#include <stdint.h>
 #include <boost/circular_buffer.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
+#include <boost/make_shared.hpp>
+
+using boost::make_shared;
+using boost::shared_ptr;
+using boost::weak_ptr;
+using boost::static_pointer_cast;
 
 #include "VampAlsaHost.hpp"
 
 class Pollable;
-typedef std::map < std::string, std::shared_ptr < Pollable > > PollableSet;
+typedef std::map < std::string, shared_ptr < Pollable > > PollableSet;
 
 class Pollable {
 public:
@@ -25,12 +34,12 @@ public:
   static PollableSet pollables; // map of Pollables, indexed by label, values are shared pointers; this owns its objects
   static void remove(const string& label);
   static Pollable * lookupByName (const std::string& label);
-  static std::shared_ptr < Pollable > lookupByNameShared (const std::string& label);
+  static shared_ptr < Pollable > lookupByNameShared (const std::string& label);
   static void requestPollFDRegen();
   static int poll(int timeout); // do one round of polling; return 0 on okay; errno otherwise
 
 protected:
-  static std::vector <struct pollfd> pollfds; // in same order as pollables, but some pollables may have 0 or more than 1 FD
+  static std::vector <struct pollfd> allpollfds; // in same order as pollables, but some pollables may have 0 or more than 1 FD
   static PollableSet deferred_removes;
   static bool regen_pollfds;
   static bool have_deferrals;
@@ -42,7 +51,10 @@ protected:
 
 public:
 
-  Pollable(string & label);
+  Pollable(const string & label);
+
+  virtual ~Pollable();
+
   string label;
   virtual string toJSON() = 0;
   virtual bool queueOutput(const char * p, uint32_t len, void * meta = 0);
@@ -55,7 +67,7 @@ public:
   virtual int getPollFDs (struct pollfd * pollfds) = 0; // copy pollfds for this Pollable to the location specified (return non-zero on error)
   // (i.e. this reports pollable fds and the pollfd "events" field for this object)
   virtual int getOutputFD() = 0; // return the output pollfd, if applicable
-  virtual void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) = 0; // handle possible event(s) on the fds for this Pollable
+  virtual void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {}; // handle possible event(s) on the fds for this Pollable
   virtual int start(double timeNow) = 0;
   virtual void stop(double timeNow) = 0;
 
