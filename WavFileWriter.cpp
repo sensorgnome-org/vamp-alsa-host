@@ -21,6 +21,7 @@ WavFileWriter::WavFileWriter (string &connLabel, string &label, char *pathTempla
   pollfd.events = 0;
   fillWaveFileHeader(rate, 1, framesToWrite); // FIXME: mono S16_LE hardcoded here
   outputBuffer = boost::circular_buffer < char > (OUTPUT_BUFFER_SIZE);
+  filename[0]=0;
 };
 
 int WavFileWriter::getNumPollFDs() {
