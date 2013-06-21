@@ -69,9 +69,13 @@ void WavFileWriter::openOutputFile(double first_timestamp) {
     int n = 1;
     while (frac_sec[n] == 'Q')
       ++n;
+    if (n > 10)
+      n = 10;
     static char digfmt[] = "%.1f";
+    static char digout[11];
     digfmt[2] = '0' + (n-1);
-    snprintf(frac_sec, n+1, digfmt, first_timestamp - tt);
+    snprintf(digout, n+1, digfmt, first_timestamp - tt);
+    memcpy(frac_sec, digout, n+1);
   }
 
   pollfd.fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOATIME | O_NONBLOCK , S_IRWXU | S_IRWXG);
