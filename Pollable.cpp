@@ -15,15 +15,19 @@ Pollable::~Pollable() {
 
 void 
 Pollable::remove(const std::string& label) {
-  shared_ptr < Pollable >  p = pollables[label];
-  Pollable * pp = p.get();
-  if (!pp)
+  if (! pollables.count(label))
     return;
+  shared_ptr < Pollable > p = pollables[label];
+  Pollable * pp = p.get();
+  if (!pp) {
+    pollables.erase(label);
+    return;
+  }
   if (! doing_poll) {
-    pollables.erase(pp->label);
+    pollables.erase(label);
     regen_pollfds = true;
   } else {
-    deferred_removes[pp->label] = p;
+    deferred_removes.push_back(label);
     have_deferrals = true;
   }
 };
@@ -92,8 +96,8 @@ Pollable::doDeferrals() {
     return;
   have_deferrals = false;
   regen_pollfds = true;
-  for (PollableSet::iterator is = deferred_removes.begin(); is != deferred_removes.end(); ++is) 
-    pollables.erase(is->first);
+  for (std::vector < std::string> ::iterator is = deferred_removes.begin(); is != deferred_removes.end(); ++is) 
+    pollables.erase(*is);
   deferred_removes.clear();
 };
     
@@ -175,7 +179,7 @@ Pollable::writeSomeOutput (int maxBytes) {
 // static initializers
 std::vector < struct pollfd > Pollable::allpollfds(5);
 PollableSet Pollable::pollables;
-PollableSet Pollable::deferred_removes;
+std::vector < std::string > Pollable::deferred_removes;
 bool Pollable::regen_pollfds = true;
 bool Pollable::have_deferrals = false;
 bool Pollable::doing_poll = false;

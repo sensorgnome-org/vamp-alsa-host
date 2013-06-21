@@ -31,7 +31,7 @@ public:
 
   static const unsigned DEFAULT_OUTPUT_BUFFER_SIZE = 16384; // default size of output buffer; subclasses may request larger 
 
-  static PollableSet pollables; // map of Pollables, indexed by label, values are shared pointers; this owns its objects
+  static PollableSet pollables; // map of Pollables, indexed by label, values are shared pointers
   static void remove(const string& label);
   static Pollable * lookupByName (const std::string& label);
   static shared_ptr < Pollable > lookupByNameShared (const std::string& label);
@@ -40,7 +40,7 @@ public:
 
 protected:
   static std::vector <struct pollfd> allpollfds; // in same order as pollables, but some pollables may have 0 or more than 1 FD
-  static PollableSet deferred_removes;
+  static std::vector < std::string > deferred_removes;
   static bool regen_pollfds;
   static bool have_deferrals;
   static bool doing_poll;
