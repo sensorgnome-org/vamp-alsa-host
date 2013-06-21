@@ -29,7 +29,7 @@ struct WavFileHeader {
 class WavFileWriter : public Pollable {
 
 protected:
-  string connLabel; // label of TCP connection controlling us; we send it error and done messages
+  string portLabel; // label of port device is attached to
   static const unsigned OUTPUT_BUFFER_SIZE = 16777216; // 16 M output buffer
 
   //  boost::circular_buffer < char > outputBuffer;  // output data waiting to be written to file
@@ -53,7 +53,7 @@ protected:
 
 public:
 
-  WavFileWriter (string &connLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate);
+  WavFileWriter (string &portLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate);
   
   int getNumPollFDs();
 

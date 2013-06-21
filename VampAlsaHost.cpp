@@ -106,14 +106,13 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
           if (strlen(path_template) == 0) {
             reply << "{\"error\": \"Error: invalid path template - did you forget double quotes?\"}\n";
           } else {
-            new WavFileWriter (connLabel, wavLabel, path_template, frames, rate);
+            new WavFileWriter (label, wavLabel, path_template, frames, rate);
             p->addRawListener(wavLabel, round(p->hwRate / rate));
           }
         } else {
           p->removeRawListener(wavLabel);
+          Pollable::remove(wavLabel);
         }
-      } else if (word == "rawNone") {
-        p->removeAllRawListeners();
       }
     } else {
       reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}\n";
@@ -363,10 +362,6 @@ VampAlsaHost::commandHelp =
 
           "       rawFileOff DEV_LABEL\n"
           "          Stop writing raw data from the device DEV_LABEL to a file, and stop queuing raw data.\n"
-          "          Note: this command does not return a reply unless there is an error.\n\n"
-
-          "       rawNone DEV_LABEL\n"
-          "          Stop not send raw data from the device DEV_LABEL to *any* TCP connections.\n"
           "          Note: this command does not return a reply unless there is an error.\n\n"
 
           "       fmOn DEV_LABEL\n"

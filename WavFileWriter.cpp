@@ -6,9 +6,9 @@
 #include <math.h>
 #include <stdio.h>
 
-WavFileWriter::WavFileWriter (string &connLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate) :
+WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate) :
   Pollable(label),
-  connLabel(connLabel),
+  portLabel(portLabel),
   pathTemplate(pathTemplate),
   framesToWrite(framesToWrite),
   bytesToWrite(framesToWrite * 2), // FIXME: mono S16_LE hardcoded here
@@ -85,9 +85,8 @@ void WavFileWriter::doneOutputFile() {
     pollfd.fd = -1;
   }
   requestPollFDRegen();
-  timestampCaptured = false;
-  headerWritten = false;
-  byteCountdown = bytesToWrite;
+  std::cerr << "{\"event\":\"rawFileDone\",\"devLabel\":\"" << portLabel << "\"}" << std::endl;
+  Pollable::remove(label);
 };
   
 void WavFileWriter::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
