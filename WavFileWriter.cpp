@@ -74,7 +74,7 @@ void WavFileWriter::openOutputFile(double first_timestamp) {
     static char digfmt[] = "%.Xf"; // NB: 'X' replaced by digit count below
     static char digout[12];
     digfmt[2] = '0' + (n-1);
-    snprintf(digout, n+1, digfmt, first_timestamp - tt);
+    snprintf(digout, n+3, digfmt, first_timestamp - tt);
     memcpy(frac_sec, digout+1, n+1); // NB: skip leading zero
   }
 
