@@ -71,11 +71,11 @@ void WavFileWriter::openOutputFile(double first_timestamp) {
       ++n;
     if (n > 10)
       n = 10;
-    static char digfmt[] = "%.1f";
-    static char digout[11];
+    static char digfmt[] = "%.Xf"; // NB: 'X' replaced by digit count below
+    static char digout[12];
     digfmt[2] = '0' + (n-1);
     snprintf(digout, n+1, digfmt, first_timestamp - tt);
-    memcpy(frac_sec, digout, n+1);
+    memcpy(frac_sec, digout+1, n+1); // NB: skip leading zero
   }
 
   pollfd.fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOATIME | O_NONBLOCK , S_IRWXU | S_IRWXG);
