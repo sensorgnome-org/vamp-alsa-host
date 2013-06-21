@@ -42,7 +42,7 @@ vamp-host.o: vamp-host.cpp
 	g++  $(CCOPTS) -c -o $@ $<
 
 vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o PluginRunner.o VampAlsaHost.o AlsaMinder.o WavFileWriter.o
-	g++ $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk
+	g++ $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk -lboost_filesystem -lboost_system
 
 vamp-host: vamp-host.o
 	g++  -o $@ $^ -lvamp-hostsdk -lsndfile -ldl

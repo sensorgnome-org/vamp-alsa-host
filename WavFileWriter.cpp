@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <boost/filesystem.hpp>
 
 WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate) :
   Pollable(label),
@@ -77,6 +78,8 @@ void WavFileWriter::openOutputFile(double first_timestamp) {
     snprintf(digout, n+3, digfmt, first_timestamp - tt);
     memcpy(frac_sec, digout+1, n); // NB: skip leading zero
   }
+
+  boost::filesystem::create_directories(boost::filesystem::path(filename).parent_path());
 
   pollfd.fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOATIME | O_NONBLOCK , S_IRWXU | S_IRWXG);
   if (pollfd.fd < 0) {
