@@ -63,13 +63,13 @@ public:
 
   short & eventsOf(int offset = 0); // reference to the events field for a pollfd
 
-  virtual int getNumPollFDs() = 0;                      // return number of fds used by this Pollable (negative means error)
-  virtual int getPollFDs (struct pollfd * pollfds) = 0; // copy pollfds for this Pollable to the location specified (return non-zero on error)
+  virtual int getNumPollFDs() {return 0;};                      // return number of fds used by this Pollable (negative means error)
+  virtual int getPollFDs (struct pollfd * pollfds) {return 0;}; // copy pollfds for this Pollable to the location specified (return non-zero on error)
   // (i.e. this reports pollable fds and the pollfd "events" field for this object)
-  virtual int getOutputFD() = 0; // return the output pollfd, if applicable
+  virtual int getOutputFD() {return -1;}; // return the output pollfd, if applicable
   virtual void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {}; // handle possible event(s) on the fds for this Pollable
-  virtual int start(double timeNow) = 0;
-  virtual void stop(double timeNow) = 0;
+  virtual int start(double timeNow){ return 0;};
+  virtual void stop(double timeNow){};
 
 protected:
   int indexInPollFD;  // index of first FD in class pollfds vector (< 0 means not in pollfd vector)
