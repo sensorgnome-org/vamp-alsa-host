@@ -5,6 +5,7 @@
 #include <time.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate) :
   Pollable(label),
@@ -62,11 +63,16 @@ void WavFileWriter::openOutputFile(double first_timestamp) {
 
   // format the timestamp into the filename with 0.1 ms precision
   time_t tt = floor(first_timestamp);
-  int extra_6_digits = round((first_timestamp - tt) * 1.0e6);
-  char ts[32];
-  int nn = strftime(ts, 31, "%Y-%m-%dT%H-%M-%S.", gmtime(&tt));
-  sprintf(&ts[nn], "%06d", extra_6_digits);
-  snprintf(filename, 1023, pathTemplate.c_str(), ts);
+  strftime(filename, 1023, pathTemplate.c_str(), gmtime(&tt));
+  char *frac_sec = strstr(filename, "%Q");
+  if (frac_sec) {
+    int n = 1;
+    while (frac_sec[n] == 'Q')
+      ++n;
+    static char digfmt[] = "%.1f";
+    digfmt[2] = '0' + (n-1);
+    snprintf(frac_sec, n+1, digfmt, first_timestamp - tt);
+  }
 
   pollfd.fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOATIME | O_NONBLOCK , S_IRWXU | S_IRWXG);
   if (pollfd.fd < 0) {
