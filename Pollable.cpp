@@ -30,6 +30,8 @@ Pollable::remove(const std::string& label) {
     deferred_removes.push_back(label);
     have_deferrals = true;
   }
+  if (label == controlSocketLabel)
+    controlSocketClosed();
 };
 
 Pollable * 
@@ -176,6 +178,30 @@ Pollable::writeSomeOutput (int maxBytes) {
   }
 };
 
+void 
+Pollable::asyncMsg(std::string msg) {
+  // send an asynchronous message to the control TCP connection (the first tcp connection)
+  Pollable *con = lookupByName(controlSocketLabel);
+  if (con)
+    con->queueOutput(msg);
+}
+
+void
+Pollable::setControlSocket(std::string label) {
+  controlSocketLabel = label;
+};
+
+void
+Pollable::controlSocketClosed() {
+  controlSocketLabel = "";
+};
+
+bool 
+Pollable::haveControlSocket() {
+  return controlSocketLabel.length() > 0;
+}
+
+
 // static initializers
 std::vector < struct pollfd > Pollable::allpollfds(5);
 PollableSet Pollable::pollables;
@@ -183,4 +209,5 @@ std::vector < std::string > Pollable::deferred_removes;
 bool Pollable::regen_pollfds = true;
 bool Pollable::have_deferrals = false;
 bool Pollable::doing_poll = false;
+string Pollable::controlSocketLabel = "";
 

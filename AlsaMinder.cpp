@@ -179,8 +179,9 @@ int AlsaMinder::getPollFDs (struct pollfd *pollfds) {
   // ALSA weirdness means there may be more than one fd per audio device
   if (pcm && shouldBeRunning) {
     if (numFD != snd_pcm_poll_descriptors(pcm, pollfds, numFD)) {
-      cerr << "{\"event\":\"devProblem\",\"error\":\"snd_pcm_poll_descriptors returned error.\",\"devLabel\":\"" << label << "\"}" << endl;
-      cerr.flush();
+      std::ostringstream msg;
+      msg << "{\"event\":\"devProblem\",\"error\":\"snd_pcm_poll_descriptors returned error.\",\"devLabel\":\"" << label << "\"}\n";
+      Pollable::asyncMsg(msg.str());
       return 1;
     }
   }
@@ -206,8 +207,9 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
     Pollable::requestPollFDRegen();
     stop(timeNow);
     if (start(timeNow)) {
-      cerr << "{\"event\":\"devStalled\",\"devLabel\":\"" << label << "\",\"error\":\"poll return with POLLERR and errno=" << errno << "\"}" << endl;
-      cerr.flush();
+      std::ostringstream msg;
+      msg << "{\"event\":\"devStalled\",\"devLabel\":\"" << label << "\",\"error\":\"poll return with POLLERR and errno=" << errno << "\"}\n";
+      Pollable::asyncMsg(msg.str());
     }
     return;
   }
@@ -217,8 +219,9 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
 
     snd_pcm_sframes_t avail = snd_pcm_avail_update (pcm);
     if (avail < 0) {
-      cerr << "{\"event\":\"devStalled\",\"error\":\"snd_pcm_avail_update() when POLLIN|POLLPRI was true returned with error " << (-avail) << "\",\"devLabel\":\"" << label << "\"}" << endl;
-      cerr.flush();
+      std::ostringstream msg;
+      msg << "{\"event\":\"devStalled\",\"error\":\"snd_pcm_avail_update() when POLLIN|POLLPRI was true returned with error " << -avail << "\",\"devLabel\":\"" << label << "\"}\n";
+      Pollable::asyncMsg(msg.str());
       snd_pcm_recover(pcm, avail, 1);
       snd_pcm_prepare(pcm);
       hasError = 0;
@@ -243,8 +246,9 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
 
       int errcode;
       if ((errcode = snd_pcm_mmap_begin (pcm, & areas, & offset, & have))) {
-        cerr << "{\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_begin returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"}" << endl;
-        cerr.flush();
+        std::ostringstream msg;
+        msg << "{\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_begin returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"}\n";
+        Pollable::asyncMsg(msg.str());
         return;
       }
       avail = have;
@@ -360,14 +364,16 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       */
 
       if (0 > snd_pcm_mmap_commit (pcm, offset, avail)) {
-        cerr << "{\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_commit returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"}" << endl;
-        cerr.flush();
+        std::ostringstream msg;
+        msg << "{\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_commit returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"}\n";
+        Pollable::asyncMsg(msg.str());
       }
     }
   } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_AUDIO_QUIET_TIME) {
     // this device appears to have stopped delivering audio; try restart it
-    cerr << "{\"event\":\"buffer overflow?\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs; restarting\",\"devLabel\":\"" << label << "\"}" << endl;
-    cerr.flush();
+    std::ostringstream msg;
+    msg << "{\"event\":\"buffer overflow?\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs; restarting\",\"devLabel\":\"" << label << "\"}\n";
+    Pollable::asyncMsg(msg.str());
     lastDataReceived = timeNow; // wait before next restart
     stop(timeNow);
     start(timeNow);

@@ -37,6 +37,9 @@ public:
   static shared_ptr < Pollable > lookupByNameShared (const std::string& label);
   static void requestPollFDRegen();
   static int poll(int timeout); // do one round of polling; return 0 on okay; errno otherwise
+  static void setControlSocket(string label);
+  static void controlSocketClosed();
+  static bool haveControlSocket();
 
 protected:
   static std::vector <struct pollfd> allpollfds; // in same order as pollables, but some pollables may have 0 or more than 1 FD
@@ -46,6 +49,8 @@ protected:
   static bool doing_poll;
   static void doDeferrals();  
   static void regenFDs();
+  static void asyncMsg(std::string msg); // send an asynchronous message to the control TCP connection (the first tcp connection)
+  static string controlSocketLabel;
 
   /* instance members */
 

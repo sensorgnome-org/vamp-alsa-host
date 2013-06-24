@@ -54,7 +54,7 @@ bool WavFileWriter::queueOutput(const char *p, uint32_t len, void * meta) {
   bool rv = Pollable::queueOutput(p, len);
   
   if (pollfd.fd < 0)
-    openOutputFile(lastFrameTimestamp - len / (2.0 * rate));    
+    openOutputFile(lastFrameTimestamp - outputBuffer.size() / (2.0 * rate));    
 
   return rv;
 };
@@ -84,7 +84,7 @@ void WavFileWriter::openOutputFile(double first_timestamp) {
   pollfd.fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOATIME | O_NONBLOCK , S_IRWXU | S_IRWXG);
   if (pollfd.fd < 0) {
     // FIXME: emit an error message so nodejs code can try with a new path
-    doneOutputFile();
+    errorOutputFile(-pollfd.fd);
     return;
   } else {
     pollfd.events |= POLLOUT;
@@ -98,7 +98,21 @@ void WavFileWriter::doneOutputFile() {
     pollfd.fd = -1;
   }
   requestPollFDRegen();
-  std::cerr << "{\"event\":\"rawFileDone\",\"devLabel\":\"" << portLabel << "\"}" << std::endl;
+  std::ostringstream msg;
+  msg << "{\"async\":true,\"event\":\"rawFileDone\",\"devLabel\":\"" << portLabel << "\"}\n";
+  Pollable::asyncMsg(msg.str());
+  Pollable::remove(label);
+};
+  
+void WavFileWriter::errorOutputFile(int err) {
+  if (pollfd.fd >= 0) {
+    close(pollfd.fd);
+    pollfd.fd = -1;
+  }
+  requestPollFDRegen();
+  std::ostringstream msg;
+  msg << "{\"async\":true,\"event\":\"rawFileError\",\"devLabel\":\"" << portLabel << "\",\"errno\":" << err << "}\n";
+  Pollable::asyncMsg(msg.str());
   Pollable::remove(label);
 };
   

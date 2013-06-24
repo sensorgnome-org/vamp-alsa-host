@@ -23,8 +23,10 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
   string word;
   istringstream cmd(cmdString);
   double realTimeNow = now(false);
+
   if (! (cmd >> word))
     return reply.str();
+    
   if (word == "stopAll") {
     // quick stop of all devices
     struct timespec t;
@@ -113,6 +115,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
           p->removeRawListener(wavLabel);
           Pollable::remove(wavLabel);
         }
+        reply << "{}\n";
       }
     } else {
       reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}\n";
@@ -123,6 +126,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     AlsaMinder *p = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(label));
     if (p) {
       p->setDemodFMForRaw(word == "fmOn");
+      reply << "{}\n";
     } else {
       reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}\n";
     }
@@ -362,7 +366,6 @@ VampAlsaHost::commandHelp =
 
           "       rawFileOff DEV_LABEL\n"
           "          Stop writing raw data from the device DEV_LABEL to a file, and stop queuing raw data.\n"
-          "          Note: this command does not return a reply unless there is an error.\n\n"
 
           "       fmOn DEV_LABEL\n"
           "          Specify that raw data from the device DEV_LABEL will be FM-demodulated\n"
@@ -373,12 +376,10 @@ VampAlsaHost::commandHelp =
           "          Finally, this command only has effect on a stereo device, and will reduce\n"
           "          the raw output to a single channel.  This command is likely only to be\n"
           "          useful for radio receivers which output I/Q as stereo audio channels.\n\n"
-          "          Note: this command does not return a reply unless there is an error.\n\n"
     
           "       fmOff DEV_LABEL\n"
           "          Turn off FM-demodulation for the specified device;  raw data will be sent\n"
           "          to any listening TCP connections as-is.\n"
-          "          Note: this command does not return a reply unless there is an error.\n\n"
 
           "       start DEV_LABEL\n"
           "          Begin acquiring data from the audio device identified by DEV_LABEL.\n"

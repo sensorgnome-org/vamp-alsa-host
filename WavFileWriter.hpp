@@ -50,6 +50,7 @@ protected:
 
   void openOutputFile(double firstTimestamp);
   void doneOutputFile();
+  void errorOutputFile(int err);
 
 public:
 

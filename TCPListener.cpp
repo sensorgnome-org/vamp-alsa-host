@@ -33,6 +33,8 @@ void TCPListener::handleEvents (struct pollfd *pollfds, bool timedOut, double ti
       ostringstream label("Socket#", std::ios_base::app);
       label << conn_fd;
       new TCPConnection (conn_fd, label.str(), & VampAlsaHost::runCommand, quiet, timeNow);
+      if (! Pollable::haveControlSocket())
+        Pollable::setControlSocket(label.str());
     }
   }
 };
