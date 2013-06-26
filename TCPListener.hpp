@@ -23,7 +23,7 @@ class TCPListener : public Pollable {
 
   string toJSON();
 
-  bool queueOutput (const char * p, uint32_t len, void * meta = 0) {return true;};
+  bool queueOutput (const char * p, uint32_t len, double timestamp = 0) {return true;};
 
   int getNumPollFDs();
                       // return number of fds used by this Pollable (negative means error)

@@ -108,8 +108,15 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
           if (strlen(path_template) == 0) {
             reply << "{\"error\": \"Error: invalid path template - did you forget double quotes?\"}\n";
           } else {
-            new WavFileWriter (label, wavLabel, path_template, frames, rate);
-            p->addRawListener(wavLabel, round(p->hwRate / rate));
+            WavFileWriter * wav = dynamic_cast < WavFileWriter * > (Pollable::lookupByName(wavLabel));
+            // if there is already a raw listener on that device, just change
+            // its path template so it can begin recording another file
+            if (wav) {
+              wav->resumeWithNewFile(path_template);
+            } else {
+              new WavFileWriter (label, wavLabel, path_template, frames, rate);
+              p->addRawListener(wavLabel, round(p->hwRate / rate));
+            }
           }
         } else {
           p->removeRawListener(wavLabel);

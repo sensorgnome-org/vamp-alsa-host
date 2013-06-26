@@ -317,8 +317,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
 
           if (Pollable * ptr = (ir->second).lock().get()) {
-            double lastTimestamp = frameTimestamp + downSampleAvail * (double) downSampleFactor / hwRate;
-            ptr->queueOutput((char *) rawSamples, downSampleAvail * 2, &lastTimestamp ); // NB: hardcoded S16_LE sample size
+            ptr->queueOutput((char *) rawSamples, downSampleAvail * 2, frameTimestamp ); // NB: hardcoded S16_LE sample size
             ++ir;
           } else {
             RawListenerSet::iterator to_delete = ir++;

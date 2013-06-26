@@ -62,8 +62,8 @@ public:
 
   string label;
   virtual string toJSON() = 0;
-  virtual bool queueOutput(const char * p, uint32_t len, void * meta = 0);
-  virtual bool queueOutput(std::string &str, void * meta = 0) {return queueOutput(str.data(), str.length(), meta);};
+  virtual bool queueOutput(const char * p, uint32_t len, double timestamp = 0.0);
+  virtual bool queueOutput(std::string &str, double timestamp = 0) {return queueOutput(str.data(), str.length(), timestamp);};
   int writeSomeOutput(int maxBytes);
 
   short & eventsOf(int offset = 0); // reference to the events field for a pollfd

@@ -51,7 +51,6 @@ vamp-host: vamp-host.o
 
 AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
 AlsaMinder.o: ParamSet.hpp
-OutputListener.o: OutputListener.hpp
 PluginRunner.o: PluginRunner.hpp ParamSet.hpp Pollable.hpp VampAlsaHost.hpp
 PluginRunner.o: AlsaMinder.hpp
 TCPConnection.o: TCPConnection.hpp Pollable.hpp VampAlsaHost.hpp

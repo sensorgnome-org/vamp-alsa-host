@@ -46,11 +46,13 @@ protected:
 
   char filename[1024]; // most recently opened file
 
+  uint32_t totalFilesWritten;    // for all completed files
+  uint64_t totalSecondsWritten;  // for all completed files
+
   void fillWaveFileHeader (int rate, int numChan, uint32_t frames); // fill the .WAV file header 
 
   void openOutputFile(double firstTimestamp);
-  void doneOutputFile();
-  void errorOutputFile(int err);
+  void doneOutputFile(int err = 0);
 
 public:
 
@@ -62,13 +64,15 @@ public:
 
   int getOutputFD(){return 0;}; 
 
-  bool queueOutput(const char *p, uint32_t len, void * meta = 0);
+  bool queueOutput(const char *p, uint32_t len, double timestamp = 0);
     
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
   void stop(double timeNow);
 
   int start(double timeNow);
+
+  void resumeWithNewFile(string path);
 
   string toJSON();
 

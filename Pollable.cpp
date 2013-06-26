@@ -3,14 +3,16 @@
 
 Pollable::Pollable(const std::string& label) : 
   label(label), 
+  indexInPollFD(-1),
   outputBuffer(DEFAULT_OUTPUT_BUFFER_SIZE)
 {
+  pollfd.fd = -1;
   pollables[label] = shared_ptr < Pollable > (this);
   regen_pollfds = true;
 };
   
 Pollable::~Pollable() {
-  std::cout << "About to destroy Pollable with label " << label << std::endl;
+  //  std::cout << "About to destroy Pollable with label " << label << std::endl;
 };
 
 void 
@@ -70,7 +72,7 @@ Pollable::poll(int timeout) {
   int rv = ::poll(& allpollfds[0], allpollfds.size(), timeout);
   if (rv < 0) {
     doing_poll = false;
-    std::cerr << "poll returned error - vamp-alsa-host" << std::endl;
+    //    std::cerr << "poll returned error - vamp-alsa-host" << std::endl;
     return errno;
   }
 
@@ -86,6 +88,8 @@ Pollable::poll(int timeout) {
     if (i < 0)
       continue;
     ptr->handleEvents(&allpollfds[i], timedOut, VampAlsaHost::now());
+    if (regen_pollfds)
+      break;
   }
   doing_poll = false;
   doDeferrals();
@@ -132,7 +136,7 @@ Pollable::regenFDs() {
 }
 
 bool
-Pollable::queueOutput(const char *p, uint32_t len, void * meta) {
+Pollable::queueOutput(const char *p, uint32_t len, double timestamp) {
   if ((unsigned) len > outputBuffer.capacity())
     return false;
 

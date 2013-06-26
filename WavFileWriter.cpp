@@ -8,6 +8,8 @@
 #include <string.h>
 #include <boost/filesystem.hpp>
 
+#include <unistd.h>
+
 WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate) :
   Pollable(label),
   portLabel(portLabel),
@@ -17,7 +19,9 @@ WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTempla
   byteCountdown(framesToWrite * 2),
   headerWritten(false),
   timestampCaptured(false),
-  rate(rate)
+  rate(rate),
+  totalFilesWritten(0),
+  totalSecondsWritten(0)
 {
   pollfd.fd = -1;
   pollfd.events = 0;
@@ -35,21 +39,20 @@ int WavFileWriter::getPollFDs (struct pollfd * pollfds) {
   return 0;
 };
 
-bool WavFileWriter::queueOutput(const char *p, uint32_t len, void * meta) {
+bool WavFileWriter::queueOutput(const char *p, uint32_t len, double timestamp) {
   // if we've already opened a file, drop samples that would overflow the
   // buffer
   if (timestampCaptured) {
-    len = std::min((int) outputBuffer.reserve(), (int) len);
+    len = std::min((uint32_t) outputBuffer.reserve(), len);
   }
 
   if (len == 0)
     return false;
 
-  // if non-null, meta points to a double, which is the timestamp for
-  // the first frame; we save the timestamp for the last frame, by
-  // adding the rate.  FIXME: hardcoded assumption of S16_LE and 1 channel
+  // get the timestamp for the last frame we're adding, from the timestamp
+  // for the first frame.   FIXME: hardcoded assumption of S16_LE and 1 channel
 
-  lastFrameTimestamp = (len - 1) / (2.0 * rate) + * (double *) meta;
+  lastFrameTimestamp = (len - 2) / (2.0 * rate) + timestamp;
 
   bool rv = Pollable::queueOutput(p, len);
   
@@ -60,9 +63,12 @@ bool WavFileWriter::queueOutput(const char *p, uint32_t len, void * meta) {
 };
 
 void WavFileWriter::openOutputFile(double first_timestamp) {
+  if (pathTemplate == "")
+    return;
+
   timestampCaptured = true;
 
-  // format the timestamp into the filename with 0.1 ms precision
+  // format the timestamp into the filename with fractional second precision
   time_t tt = floor(first_timestamp);
   strftime(filename, 1023, pathTemplate.c_str(), gmtime(&tt));
   char *frac_sec = strstr(filename, "%Q");
@@ -82,40 +88,36 @@ void WavFileWriter::openOutputFile(double first_timestamp) {
   boost::filesystem::create_directories(boost::filesystem::path(filename).parent_path());
 
   pollfd.fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOATIME | O_NONBLOCK , S_IRWXU | S_IRWXG);
+  requestPollFDRegen();
   if (pollfd.fd < 0) {
     // FIXME: emit an error message so nodejs code can try with a new path
-    errorOutputFile(-pollfd.fd);
+    doneOutputFile(-pollfd.fd);
     return;
   } else {
     pollfd.events |= POLLOUT;
-    requestPollFDRegen();
   }
 }
 
-void WavFileWriter::doneOutputFile() {
+void WavFileWriter::doneOutputFile(int err) {
   if (pollfd.fd >= 0) {
     close(pollfd.fd);
     pollfd.fd = -1;
+    ++totalFilesWritten;
+    totalSecondsWritten += (bytesToWrite - byteCountdown) / (2.0 * rate); // FIXME: hardwired S16_LE mono format 
   }
   requestPollFDRegen();
   std::ostringstream msg;
-  msg << "{\"async\":true,\"event\":\"rawFileDone\",\"devLabel\":\"" << portLabel << "\"}\n";
+  msg << "{\"async\":true,\"event\":\"" << (err ? "rawFileError" : "rawFileDone") << "\",\"devLabel\":\"" << portLabel << "\"";
+  if (err)
+    msg << ",\"errno\":" << err;
+  msg << "}\n";        
   Pollable::asyncMsg(msg.str());
-  Pollable::remove(label);
+  if (err) 
+    Pollable::remove(label);
+  else
+    pathTemplate = "";
 };
-  
-void WavFileWriter::errorOutputFile(int err) {
-  if (pollfd.fd >= 0) {
-    close(pollfd.fd);
-    pollfd.fd = -1;
-  }
-  requestPollFDRegen();
-  std::ostringstream msg;
-  msg << "{\"async\":true,\"event\":\"rawFileError\",\"devLabel\":\"" << portLabel << "\",\"errno\":" << err << "}\n";
-  Pollable::asyncMsg(msg.str());
-  Pollable::remove(label);
-};
-  
+
 void WavFileWriter::handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow) {
 
   if (pollfds->revents & (POLLERR | POLLHUP | POLLNVAL)) {
@@ -128,6 +130,10 @@ void WavFileWriter::handleEvents (struct pollfd *pollfds, bool timedOut, double 
 
     // if a header hasn't been written, write it
     if (! headerWritten) {
+      off_t blam = lseek(pollfd.fd, 0, SEEK_CUR);
+      if (blam != 0) {
+        std::cerr << "Whoa!: writing header at " << blam << std::endl;
+      }
       int num_bytes = write(pollfd.fd, (char *) & hdr, sizeof(hdr));
       headerWritten = true;
       if (num_bytes != sizeof(hdr)) {
@@ -156,6 +162,16 @@ int WavFileWriter::start(double timeNow) {
   return 0;
 };
 
+void
+WavFileWriter::resumeWithNewFile(string path) {
+  pollfd.fd = -1;
+  pathTemplate = path;
+  headerWritten = false;
+  timestampCaptured = false;
+  byteCountdown = bytesToWrite;
+};
+
+
 string WavFileWriter::toJSON() {
   ostringstream s;
   s << "{" 
@@ -164,6 +180,8 @@ string WavFileWriter::toJSON() {
     << ",\"fileName\":\"" << (char *) filename
     << "\",\"framesWritten\":" << (uint32_t) ((bytesToWrite - byteCountdown) / 2)
     << ",\"secondsWritten\":" << ((bytesToWrite - byteCountdown) / (2.0 * rate))   
+    << ",\"totalFilesWritten\":" << totalFilesWritten
+    << ",\"totalSecondsWritten\":" << totalSecondsWritten
     << "}";
   return s.str();
 };
