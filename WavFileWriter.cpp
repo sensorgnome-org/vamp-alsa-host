@@ -180,9 +180,11 @@ string WavFileWriter::toJSON() {
   ostringstream s;
   s << "{" 
     << "\"type\":\"WavFileWriter\""
-    << ",\"fileDescriptor\":" << pollfd.fd
+    << ",\"port\":\"" << portLabel
+    << "\",\"fileDescriptor\":" << pollfd.fd
     << ",\"fileName\":\"" << (char *) filename
     << "\",\"framesWritten\":" << (uint32_t) ((bytesToWrite - byteCountdown) / 2)
+    << ",\"framesToWrite\":" << framesToWrite
     << ",\"secondsWritten\":"  << std::setprecision(16) << ((bytesToWrite - byteCountdown) / (2.0 * rate))   
     << ",\"totalFilesWritten\":" << totalFilesWritten
     << ",\"totalSecondsWritten\":" << totalSecondsWritten
