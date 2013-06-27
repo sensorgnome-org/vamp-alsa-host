@@ -2,8 +2,8 @@ CCOPTS_PRODUCTION :=  -I. -O3 -Wall -fPIC -ftree-vectorize -ffast-math -mcpu=cor
 
 CCOPTS_DEBUG      :=  -I. -g3 -Wall -fPIC -ftree-vectorize -ffast-math -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
-#CCOPTS := $(CCOPTS_PRODUCTION)
-CCOPTS := $(CCOPTS_DEBUG)
+CCOPTS := $(CCOPTS_PRODUCTION)
+#CCOPTS := $(CCOPTS_DEBUG)
 
 all: vamp-alsa-host 
 

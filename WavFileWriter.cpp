@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <boost/filesystem.hpp>
+#include <iomanip>
 
 #include <unistd.h>
 
@@ -17,11 +18,13 @@ WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTempla
   framesToWrite(framesToWrite),
   bytesToWrite(framesToWrite * 2), // FIXME: mono S16_LE hardcoded here
   byteCountdown(framesToWrite * 2),
+  currFileTimestamp(-1),
+  prevFileTimestamp(-1),
   headerWritten(false),
   timestampCaptured(false),
-  rate(rate),
   totalFilesWritten(0),
-  totalSecondsWritten(0)
+  totalSecondsWritten(0),
+  rate(rate)
 {
   pollfd.fd = -1;
   pollfd.events = 0;
@@ -65,7 +68,7 @@ bool WavFileWriter::queueOutput(const char *p, uint32_t len, double timestamp) {
 void WavFileWriter::openOutputFile(double first_timestamp) {
   if (pathTemplate == "")
     return;
-
+  currFileTimestamp = first_timestamp;
   timestampCaptured = true;
 
   // format the timestamp into the filename with fractional second precision
@@ -104,6 +107,7 @@ void WavFileWriter::doneOutputFile(int err) {
     pollfd.fd = -1;
     ++totalFilesWritten;
     totalSecondsWritten += (bytesToWrite - byteCountdown) / (2.0 * rate); // FIXME: hardwired S16_LE mono format 
+    prevFileTimestamp = currFileTimestamp;
   }
   requestPollFDRegen();
   std::ostringstream msg;
@@ -179,9 +183,11 @@ string WavFileWriter::toJSON() {
     << ",\"fileDescriptor\":" << pollfd.fd
     << ",\"fileName\":\"" << (char *) filename
     << "\",\"framesWritten\":" << (uint32_t) ((bytesToWrite - byteCountdown) / 2)
-    << ",\"secondsWritten\":" << ((bytesToWrite - byteCountdown) / (2.0 * rate))   
+    << ",\"secondsWritten\":"  << std::setprecision(16) << ((bytesToWrite - byteCountdown) / (2.0 * rate))   
     << ",\"totalFilesWritten\":" << totalFilesWritten
     << ",\"totalSecondsWritten\":" << totalSecondsWritten
+    << ",\"prevFileTimestamp\":" << prevFileTimestamp
+    << ",\"currFileTimestamp\":" << currFileTimestamp
     << "}";
   return s.str();
 };

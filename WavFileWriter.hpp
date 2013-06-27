@@ -38,6 +38,8 @@ protected:
   int32_t bytesToWrite;  // number of bytes to write to file
   int32_t byteCountdown; // number of bytes remaining to write
   double lastFrameTimestamp;
+  double currFileTimestamp; // timestamp of first sample of current file
+  double prevFileTimestamp; // timestamp of first sample of previously written file, for calculating mic digitizer clock bias
   WavFileHeader hdr; // buffer to store header
   bool headerWritten; // has a header been written to the current output file?
   bool timestampCaptured; // has the timestamp for the filename been captured?  If so, don't allow the start of
