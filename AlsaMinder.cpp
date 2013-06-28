@@ -98,13 +98,23 @@ void AlsaMinder::removePluginRunner(std::string &label) {
   plugins.erase(label);
 };
 
-void AlsaMinder::addRawListener(string &label, int downSampleFactor) {
+void AlsaMinder::addRawListener(string &label, int downSampleFactor, bool writeWavHeader) {
   
-  rawListeners[label] = Pollable::lookupByNameShared(label);
+  shared_ptr < Pollable > sptr;
+  rawListeners[label] = sptr = Pollable::lookupByNameShared(label);
   if (rawListeners.size() == 1) {
     this->downSampleFactor = downSampleFactor;
     downSampleCount = downSampleFactor;
     downSampleAccum = 0;
+  }
+  if (writeWavHeader) {
+    Pollable *ptr = sptr.get();
+    if (ptr) {
+      // default max possible frames in .WAV header
+      // FIXME: hardcoded 16-bit mono
+      WavFileHeader hdr(hwRate / downSampleFactor, 1, 0x7ffffffe / 2);
+      ptr->queueOutput(hdr.address(), hdr.size());
+    }
   }
 };
 

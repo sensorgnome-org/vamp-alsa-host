@@ -9,22 +9,7 @@ using std::string;
 using std::istringstream;
 
 #include "Pollable.hpp"
-
-struct WavFileHeader {
-  char RIFFlabel[4];
-  uint32_t remFileSize;
-  char WAVElabel[4];
-  char FMTlabel[4];
-  uint32_t remFmtSize;
-  uint16_t fmtCode;
-  uint16_t numChan;
-  uint32_t sampleRate;
-  uint32_t byteRate;
-  uint16_t frameSize;
-  uint16_t sampleSize;
-  char DATAlabel[4];
-  uint32_t remDataSize;
-} __attribute__((packed));
+#include "WavFileHeader.hpp"
   
 class WavFileWriter : public Pollable {
 
@@ -50,8 +35,6 @@ protected:
 
   uint32_t totalFilesWritten;    // for all completed files
   uint64_t totalSecondsWritten;  // for all completed files
-
-  void fillWaveFileHeader (int rate, int numChan, uint32_t frames); // fill the .WAV file header 
 
   void openOutputFile(double firstTimestamp);
   void doneOutputFile(int err = 0);

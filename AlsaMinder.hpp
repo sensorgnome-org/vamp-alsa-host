@@ -14,6 +14,7 @@ using namespace std;
 
 #include "Pollable.hpp"
 #include "PluginRunner.hpp"
+#include "WavFileHeader.hpp"
 
 typedef std::map < string, weak_ptr < Pollable > > RawListenerSet;
 typedef std::map < string, weak_ptr < PluginRunner > > PluginRunnerSet;
@@ -71,7 +72,7 @@ public:
   int open();
   void addPluginRunner(std::string &label, shared_ptr < PluginRunner > pr);
   void removePluginRunner(std::string &label);
-  void addRawListener(string &label, int downSampleFactor);
+  void addRawListener(string &label, int downSampleFactor, bool writeWavHeader = false);
   void removeRawListener(string &label);
   void removeAllRawListeners();
 

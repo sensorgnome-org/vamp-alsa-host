@@ -88,9 +88,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     unsigned rate = 0;
     cmd >> rate;
     uint32_t frames = 0;
-    cmd >> frames;
-    int wav_header = 0;
-    cmd >> wav_header;
+    cmd >> frames; // this is @ frames for rawFile, FM demod flag for rawStream
     char path_template [MAX_CMD_STRING_LENGTH + 1];
     path_template[0] = 0;
     cmd.ignore(MAX_CMD_STRING_LENGTH, '"');
@@ -99,7 +97,10 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     AlsaMinder *p = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(label));
     if (p) {
       if (word == "rawStream") {
-        p->addRawListener(connLabel, round(p->hwRate / rate));
+        // set fm on/off and add a raw listener
+        // cancelling the listen will close the connection.
+        p->setDemodFMForRaw(frames);
+        p->addRawListener(connLabel, round(p->hwRate / rate), true);
       } else if (word == "rawStreamOff") {
         p->removeRawListener(connLabel);
       } else if (word == "rawFile" || word == "rawFileOff") {
@@ -133,7 +134,6 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     AlsaMinder *p = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(label));
     if (p) {
       p->setDemodFMForRaw(word == "fmOn");
-      reply << "{}\n";
     } else {
       reply << "{\"error\": \"Error: LABEL does not specify a known open device\"}\n";
     }
@@ -334,7 +334,7 @@ VampAlsaHost::commandHelp =
           "          connections already receiving data from an attached plugin.\n"
           "          Note: this command does not return a reply unless there is an error.\n\n"
   
-          "       rawStream DEV_LABEL RATE FRAMES WITH_WAV_HEADER\n"
+          "       rawStream DEV_LABEL RATE FRAMES\n"
           "          Write raw data to the TCP connection.\n"
           "          DEV_LABEL: the device from which to obtain raw data\n"
           "          RATE:   the frame rate to use.  The actual frame rate will be the closest frame rate which\n"
@@ -342,12 +342,10 @@ VampAlsaHost::commandHelp =
           "          FRAMES: the number of frames to write.  After the last frame is written, VAH will print a\n"
           "                  message of the form {\"message\": \"rawDone\", \"dev\": \"DEV_LABEL\"} to the TCP connection\n"
           "                  which issued the rawFile command.\n"
-          "          WITH_WAV_HEADER: if non-zero, indicates a .WAV file header will be written\n"
-          "                  to the file before the sample data.\n\n"
           "          If an error occurs when writing to a file, VAH will print a message of the form\n"
           "                  {\"message\": \"rawError\", \"dev\": \"DEV_LABEL\", \"errno\": errno} to the TCP connection\n"
 
-          "       rawFile DEV_LABEL RATE FRAMES WITH_WAV_HEADER PATH_TEMPLATE\n"
+          "       rawFile DEV_LABEL RATE FRAMES PATH_TEMPLATE\n"
           "          Write queued raw data to a file or the TCP connection.\n"
           "          DEV_LABEL: the device from which to obtain raw data; nothing is written until a rawOn\n"
           "                  command has been issued for this device.\n"
@@ -359,8 +357,6 @@ VampAlsaHost::commandHelp =
           "                  subsequent rawFile command can direct data to a new file without dropping frames.\n"
           "                  If a file is already being written from DEV_LABEL, this command closes that file.\n"
           "                  and immediately begins writing to the new file.\n"
-          "          WITH_WAV_HEADER: if non-zero, indicates a .WAV file header will be written\n"
-          "                  to the file before the sample data.\n\n"
           "          PATH_TEMPLATE: the template for a full pathname of the file to write; strftime format codes\n"
           "                  will be replaced by the real timestamp of the first frame written.\n"
           "                  If not specified, data will be written directly to the TCP connection.\n\n"

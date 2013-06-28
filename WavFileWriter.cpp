@@ -20,6 +20,7 @@ WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTempla
   byteCountdown(framesToWrite * 2),
   currFileTimestamp(-1),
   prevFileTimestamp(-1),
+  hdr(rate, 1, framesToWrite),
   headerWritten(false),
   timestampCaptured(false),
   totalFilesWritten(0),
@@ -28,13 +29,12 @@ WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTempla
 {
   pollfd.fd = -1;
   pollfd.events = 0;
-  fillWaveFileHeader(rate, 1, framesToWrite); // FIXME: mono S16_LE hardcoded here
   outputBuffer = boost::circular_buffer < char > (OUTPUT_BUFFER_SIZE);
   filename[0]=0;
 };
 
 int WavFileWriter::getNumPollFDs() {
-  return pollfd.fd >= 0 ? 1 : 0;
+  return (pollfd.fd >= 0) ? 1 : 0;
 };
   
 int WavFileWriter::getPollFDs (struct pollfd * pollfds) {
@@ -68,6 +68,7 @@ bool WavFileWriter::queueOutput(const char *p, uint32_t len, double timestamp) {
 void WavFileWriter::openOutputFile(double first_timestamp) {
   if (pathTemplate == "")
     return;
+  prevFileTimestamp = currFileTimestamp;
   currFileTimestamp = first_timestamp;
   timestampCaptured = true;
 
@@ -107,9 +108,9 @@ void WavFileWriter::doneOutputFile(int err) {
     pollfd.fd = -1;
     ++totalFilesWritten;
     totalSecondsWritten += (bytesToWrite - byteCountdown) / (2.0 * rate); // FIXME: hardwired S16_LE mono format 
-    prevFileTimestamp = currFileTimestamp;
   }
   requestPollFDRegen();
+
   std::ostringstream msg;
   msg << "{\"async\":true,\"event\":\"" << (err ? "rawFileError" : "rawFileDone") << "\",\"devLabel\":\"" << portLabel << "\"";
   if (err)
@@ -134,13 +135,9 @@ void WavFileWriter::handleEvents (struct pollfd *pollfds, bool timedOut, double 
 
     // if a header hasn't been written, write it
     if (! headerWritten) {
-      off_t blam = lseek(pollfd.fd, 0, SEEK_CUR);
-      if (blam != 0) {
-        std::cerr << "Whoa!: writing header at " << blam << std::endl;
-      }
-      int num_bytes = write(pollfd.fd, (char *) & hdr, sizeof(hdr));
+      size_t num_bytes = write(pollfd.fd, hdr.address(), hdr.size());
       headerWritten = true;
-      if (num_bytes != sizeof(hdr)) {
+      if (num_bytes != hdr.size()) {
         // we should deal gracefully with this, but is it ever going
         // to gag on 44 bytes?  Maybe, if the disk is full.
         doneOutputFile();
@@ -186,30 +183,12 @@ string WavFileWriter::toJSON() {
     << "\",\"framesWritten\":" << (uint32_t) ((bytesToWrite - byteCountdown) / 2)
     << ",\"framesToWrite\":" << framesToWrite
     << ",\"secondsWritten\":"  << std::setprecision(16) << ((bytesToWrite - byteCountdown) / (2.0 * rate))   
+    << ",\"secondsToWrite\":" << framesToWrite / (double) rate
     << ",\"totalFilesWritten\":" << totalFilesWritten
     << ",\"totalSecondsWritten\":" << totalSecondsWritten
     << ",\"prevFileTimestamp\":" << prevFileTimestamp
     << ",\"currFileTimestamp\":" << currFileTimestamp
+    << ",\"rate\":" << rate
     << "}";
   return s.str();
-};
-
-
-void WavFileWriter::fillWaveFileHeader (int rate, int numChan, uint32_t frames)
-{
-  uint32_t bytes = numChan * 2 * frames; // NB: hardcoded S16_LE sample format
-
-  memcpy(hdr.RIFFlabel, "RIFF", 4);
-  hdr.remFileSize = bytes + 36;
-  memcpy(hdr.WAVElabel, "WAVE", 4);
-  memcpy(hdr.FMTlabel, "fmt ", 4);
-  hdr.remFmtSize = 16;
-  hdr.fmtCode = 1; // PCM
-  hdr.numChan = numChan;
-  hdr.sampleRate = rate;
-  hdr.byteRate = rate * numChan * 2;
-  hdr.frameSize = numChan * 2;
-  hdr.sampleSize = 16;
-  memcpy(hdr.DATAlabel, "data", 4);
-  hdr.remDataSize = bytes;
 };
