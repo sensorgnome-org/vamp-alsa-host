@@ -29,25 +29,14 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     
   if (word == "stopAll") {
     // quick stop of all devices
-    struct timespec t;
-    t.tv_sec = 0;
-    t.tv_nsec = 50 * 1000 * 1000;
     for (PollableSet::iterator ips = Pollable::pollables.begin(); ips != Pollable::pollables.end(); ++ips) {
       ips->second->stop(realTimeNow);
-      // sleep 50 ms between stops
-      nanosleep(&t, 0);
     }
-    nanosleep (&t, 0);
     reply << "{\"message\":\"All devices stopped.\"}\n";
     Pollable::requestPollFDRegen();
   } else if (word == "startAll") {
-    struct timespec t;
-    t.tv_sec = 0;
-    t.tv_nsec = 100 * 1000 * 1000;
     for (PollableSet::iterator ips = Pollable::pollables.begin(); ips != Pollable::pollables.end(); ++ips) {
       ips->second->start(realTimeNow);
-      // sleep 100 ms between starts
-      nanosleep(&t, 0);
     }
     reply << "{\"message\":\"All devices started.\"}\n";
     Pollable::requestPollFDRegen();

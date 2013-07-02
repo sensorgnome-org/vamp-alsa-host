@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <boost/filesystem.hpp>
+#include <boost/thread.hpp>
 #include <iomanip>
 
 #include <unistd.h>
@@ -25,6 +26,7 @@ WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTempla
   timestampCaptured(false),
   totalFilesWritten(0),
   totalSecondsWritten(0),
+  ensureDirsState(DIR_STATE_NONE),
   rate(rate)
 {
   pollfd.fd = -1;
@@ -58,7 +60,7 @@ bool WavFileWriter::queueOutput(const char *p, uint32_t len, double timestamp) {
   lastFrameTimestamp = (len - 2) / (2.0 * rate) + timestamp;
 
   bool rv = Pollable::queueOutput(p, len);
-  
+
   if (pollfd.fd < 0)
     openOutputFile(lastFrameTimestamp - outputBuffer.size() / (2.0 * rate));    
 
@@ -66,48 +68,68 @@ bool WavFileWriter::queueOutput(const char *p, uint32_t len, double timestamp) {
 };
 
 void WavFileWriter::openOutputFile(double first_timestamp) {
-  if (pathTemplate == "")
+  if (pathTemplate == "") 
     return;
-  prevFileTimestamp = currFileTimestamp;
-  currFileTimestamp = first_timestamp;
-  timestampCaptured = true;
 
-  // format the timestamp into the filename with fractional second precision
-  time_t tt = floor(first_timestamp);
-  strftime(filename, 1023, pathTemplate.c_str(), gmtime(&tt));
-  char *frac_sec = strstr(filename, "%Q");
-  if (frac_sec) {
-    int n = 1;
-    while (frac_sec[n] == 'Q')
-      ++n;
-    if (n > 10)
-      n = 10;
-    static char digfmt[] = "%.Xf"; // NB: 'X' replaced by digit count below
-    static char digout[12];
-    digfmt[2] = '0' + (n-1);
-    snprintf(digout, n+3, digfmt, first_timestamp - tt);
-    memcpy(frac_sec, digout+1, n); // NB: skip leading zero
-  }
+  switch (ensureDirsState) {
+  case DIR_STATE_WAITING:
+    // do nothing
+    break;
 
-  boost::filesystem::create_directories(boost::filesystem::path(filename).parent_path());
+  case DIR_STATE_NONE:
+    {
+      prevFileTimestamp = currFileTimestamp;
+      currFileTimestamp = first_timestamp;
+      timestampCaptured = true;
+      // format the timestamp into the filename with fractional second precision
+      time_t tt = floor(first_timestamp);
+      strftime(filename, 1023, pathTemplate.c_str(), gmtime(&tt));
+      char *frac_sec = strstr(filename, "%Q");
+      if (frac_sec) {
+        int n = 1;
+        while (frac_sec[n] == 'Q')
+          ++n;
+        if (n > 10)
+          n = 10;
+        static char digfmt[] = "%.Xf"; // NB: 'X' replaced by digit count below
+        static char digout[12];
+        digfmt[2] = '0' + (n-1);
+        snprintf(digout, n+3, digfmt, first_timestamp - tt);
+        memcpy(frac_sec, digout+1, n); // NB: skip leading zero
+      }
 
-  pollfd.fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOATIME | O_NONBLOCK , S_IRWXU | S_IRWXG);
-  requestPollFDRegen();
-  if (pollfd.fd < 0) {
-    // FIXME: emit an error message so nodejs code can try with a new path
-    doneOutputFile(-pollfd.fd);
-    return;
-  } else {
-    pollfd.events |= POLLOUT;
+      ensureDirsState = DIR_STATE_WAITING;
+      boost::thread (this->ensureDirs, this);
+    }
+    break;
+
+  case DIR_STATE_CREATED:
+    pollfd.fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOATIME | O_NONBLOCK , S_IRWXU | S_IRWXG);
+    requestPollFDRegen();
+    if (pollfd.fd < 0) {
+      // FIXME: emit an error message so nodejs code can try with a new path
+      doneOutputFile(-pollfd.fd);
+      return;
+    } else {
+      pollfd.events |= POLLOUT;
+    }
+    ensureDirsState = DIR_STATE_NONE;
+    break;
   }
 }
+  
+void WavFileWriter::ensureDirs(WavFileWriter *wav) {
+  boost::filesystem::create_directories(boost::filesystem::path(wav->filename).parent_path());
+  wav->ensureDirsState = DIR_STATE_CREATED;
+};
 
 void WavFileWriter::doneOutputFile(int err) {
   if (pollfd.fd >= 0) {
     close(pollfd.fd);
     pollfd.fd = -1;
     ++totalFilesWritten;
-    totalSecondsWritten += (bytesToWrite - byteCountdown) / (2.0 * rate); // FIXME: hardwired S16_LE mono format 
+    prevSecondsWritten = (bytesToWrite - byteCountdown) / (2.0 * rate); // FIXME: hardwired S16_LE mono format 
+    totalSecondsWritten += prevSecondsWritten;
   }
   requestPollFDRegen();
 
@@ -188,6 +210,7 @@ string WavFileWriter::toJSON() {
     << ",\"totalSecondsWritten\":" << totalSecondsWritten
     << ",\"prevFileTimestamp\":" << prevFileTimestamp
     << ",\"currFileTimestamp\":" << currFileTimestamp
+    << ",\"prevSecondsWritten\":" << prevSecondsWritten
     << ",\"rate\":" << rate
     << "}";
   return s.str();

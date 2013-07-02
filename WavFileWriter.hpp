@@ -10,6 +10,8 @@ using std::istringstream;
 
 #include "Pollable.hpp"
 #include "WavFileHeader.hpp"
+
+class WavFileWriter;
   
 class WavFileWriter : public Pollable {
 
@@ -25,6 +27,7 @@ protected:
   double lastFrameTimestamp;
   double currFileTimestamp; // timestamp of first sample of current file
   double prevFileTimestamp; // timestamp of first sample of previously written file, for calculating mic digitizer clock bias
+  double prevSecondsWritten; // number of seconds written to previous file at nominal rate
   WavFileHeader hdr; // buffer to store header
   bool headerWritten; // has a header been written to the current output file?
   bool timestampCaptured; // has the timestamp for the filename been captured?  If so, don't allow the start of
@@ -39,6 +42,8 @@ protected:
   void openOutputFile(double firstTimestamp);
   void doneOutputFile(int err = 0);
 
+  static void ensureDirs(WavFileWriter *wav); // function called in separate thread to ensure directories for to-be-opened file are open
+  enum {DIR_STATE_NONE, DIR_STATE_WAITING, DIR_STATE_CREATED} ensureDirsState; // state of directory creation
 public:
 
   WavFileWriter (string &portLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate);
