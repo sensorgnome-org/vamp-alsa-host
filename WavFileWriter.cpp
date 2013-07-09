@@ -8,6 +8,7 @@
 #include <string.h>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
+#include <boost/thread/thread.hpp>
 #include <iomanip>
 
 #include <unistd.h>
@@ -119,6 +120,8 @@ void WavFileWriter::openOutputFile(double first_timestamp) {
 }
   
 void WavFileWriter::ensureDirs(WavFileWriter *wav) {
+  // yield immediately upon creation so we hopefully don't run until main thread is polling
+  boost::this_thread::yield();
   boost::filesystem::create_directories(boost::filesystem::path(wav->filename).parent_path());
   wav->ensureDirsState = DIR_STATE_CREATED;
 };
