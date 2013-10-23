@@ -46,7 +46,7 @@ protected:
   enum {DIR_STATE_NONE, DIR_STATE_WAITING, DIR_STATE_CREATED} ensureDirsState; // state of directory creation
 public:
 
-  WavFileWriter (string &portLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate);
+  WavFileWriter (string &portLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate, int channels);
   
   int getNumPollFDs();
 
@@ -67,6 +67,8 @@ public:
   string toJSON();
 
   int rate;
+
+  int channels;
 };
 
 #endif // WAVFILEWRITER_HPP

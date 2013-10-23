@@ -104,15 +104,17 @@ void AlsaMinder::addRawListener(string &label, int downSampleFactor, bool writeW
   rawListeners[label] = sptr = Pollable::lookupByNameShared(label);
   if (rawListeners.size() == 1) {
     this->downSampleFactor = downSampleFactor;
-    downSampleCount = downSampleFactor;
-    downSampleAccum = 0;
+    for (int i=0; i < MAX_CHANNELS; ++i) {
+      downSampleAccum[i] = 0;
+      downSampleCount[i] = downSampleFactor;
+    }
   }
   if (writeWavHeader) {
     Pollable *ptr = sptr.get();
     if (ptr) {
       // default max possible frames in .WAV header
-      // FIXME: hardcoded 16-bit mono
-      WavFileHeader hdr(hwRate / downSampleFactor, 1, 0x7ffffffe / 2);
+      // FIXME: hardcoded S16_LE format
+      WavFileHeader hdr(hwRate / downSampleFactor, numChan, 0x7ffffffe / 2);
       ptr->queueOutput(hdr.address(), hdr.size());
     }
   }
@@ -272,11 +274,12 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       */
 
       if (rawListeners.size() > 0) {
+        // FIXME: assumes interleaved channels
         src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
         step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
         src0 += step * offset;
 
-        int16_t rawSamples[avail];
+        int16_t rawSamples[numChan * avail];
         if (numChan == 2 && demodFMForRaw) {
           // do FM demodulation with simple but expensive arctan!
           float dthetaScale = hwRate / (2 * M_PI) / 75000.0 * 32767.0;
@@ -294,9 +297,10 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
             rawSamples[i] = roundf(dthetaScale * dtheta);
           }
         } else {
-          for (int i=0; i < avail; ++i) {
+          for (int i=0; i < avail * numChan; ++i) {
             rawSamples[i] = *src0;
-            src0 += step;
+            //            src0 += step;
+            ++src0;
           }
         }
 
@@ -307,27 +311,31 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         int downSampleAvail;
 
         if (downSampleFactor > 1) {
-          downSampleAvail = 0;
-          for (int i=0; i < avail; ++i) {
-            downSampleAccum += rawSamples[i];
-            if (! --downSampleCount) {
-              downSampleCount = downSampleFactor;
-              // simple dithering: round to nearest int, but retain remainder in downSampleAccum
-              int16_t downSample = (downSampleAccum + downSampleFactor / 2) / downSampleFactor;
-              rawSamples[downSampleAvail++] = downSample;
-              downSampleAccum -= downSample * downSampleFactor;
+          for (int j = 0; j < numChan; ++j) {
+            int16_t * rs = & rawSamples[j];
+            downSampleAvail = 0; // works the same for all channels
+            for (int i=0; i < avail; ++i) {
+              downSampleAccum[j] += *rs;
+              rs += numChan;
+              if (! --downSampleCount[j]) {
+                downSampleCount[j] = downSampleFactor;
+                // simple dithering: round to nearest int, but retain remainder in downSampleAccum
+                int16_t downSample = (downSampleAccum[j] + downSampleFactor / 2) / downSampleFactor;
+                rawSamples[downSampleAvail++] = downSample;
+                downSampleAccum[j] -= downSample * downSampleFactor;
+              }
             }
           }
         } else {
           downSampleAvail = avail;
         }
 
-        // there are now downSampleAvail samples, stored in rawSamples[0..downSampleAvail - 1]
+        // there are now downSampleAvail samples, stored in rawSamples[0..downSampleAvail * numChan - 1]
 
         for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
 
           if (Pollable * ptr = (ir->second).lock().get()) {
-            ptr->queueOutput((char *) rawSamples, downSampleAvail * 2, frameTimestamp ); // NB: hardcoded S16_LE sample size
+            ptr->queueOutput((char *) rawSamples, downSampleAvail * 2 * numChan, frameTimestamp ); // NB: hardcoded S16_LE sample size
             ++ir;
           } else {
             RawListenerSet::iterator to_delete = ir++;

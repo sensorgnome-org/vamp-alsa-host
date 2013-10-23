@@ -25,7 +25,7 @@ public:
   static const int  PERIOD_FRAMES         = 2400;   // 50 ms
   static const int  BUFFER_FRAMES         = 131072; // 128K appears to be max buffer size in frames; this is 2.73 seconds
   static const int  MAX_AUDIO_QUIET_TIME  = 30;     // 30 second maximum quiet time before we decide an audio data stream is dry and try restart it
-
+  static const int  MAX_CHANNELS          = 2;      // maximum of two channels per device
     
   string             alsaDev;          // ALSA path to audio device (e.g. hw:CARD=V10)
   int                rate;             // sampling rate to supply plugins with
@@ -64,8 +64,8 @@ protected:
   float             demodFMLastTheta; // value of previous phase angle for FM demodulation (in
                                       // range -pi..pi)
   int16_t           downSampleFactor; // by what factor do we downsample input audio for raw listeners
-  int16_t           downSampleCount;  // count of how many samples we've accumulated since last down sample
-  int32_t           downSampleAccum;  // accumulator for downsampling
+  int16_t           downSampleCount[MAX_CHANNELS];  // count of how many samples we've accumulated since last down sample
+  int32_t           downSampleAccum[MAX_CHANNELS];  // accumulator for downsampling
 
 public:
 

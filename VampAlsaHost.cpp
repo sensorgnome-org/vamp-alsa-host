@@ -104,7 +104,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
             if (wav) {
               wav->resumeWithNewFile(path_template);
             } else {
-              new WavFileWriter (label, wavLabel, path_template, frames, rate);
+              new WavFileWriter (label, wavLabel, path_template, frames, rate, p->numChan);
               p->addRawListener(wavLabel, round(p->hwRate / rate));
             }
           }

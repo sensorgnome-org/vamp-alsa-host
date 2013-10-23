@@ -13,22 +13,23 @@
 
 #include <unistd.h>
 
-WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate) :
+WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTemplate, uint32_t framesToWrite, int rate, int channels) :
   Pollable(label),
   portLabel(portLabel),
   pathTemplate(pathTemplate),
   framesToWrite(framesToWrite),
-  bytesToWrite(framesToWrite * 2), // FIXME: mono S16_LE hardcoded here
-  byteCountdown(framesToWrite * 2),
+  bytesToWrite(framesToWrite * 2 * channels), // FIXME: mono S16_LE hardcoded here
+  byteCountdown(framesToWrite * 2 * channels),
   currFileTimestamp(-1),
   prevFileTimestamp(-1),
-  hdr(rate, 1, framesToWrite),
+  hdr(rate, channels, framesToWrite),
   headerWritten(false),
   timestampCaptured(false),
   totalFilesWritten(0),
   totalSecondsWritten(0),
   ensureDirsState(DIR_STATE_NONE),
-  rate(rate)
+  rate(rate),
+  channels(channels)
 {
   pollfd.fd = -1;
   pollfd.events = 0;
@@ -56,14 +57,14 @@ bool WavFileWriter::queueOutput(const char *p, uint32_t len, double timestamp) {
     return false;
 
   // get the timestamp for the last frame we're adding, from the timestamp
-  // for the first frame.   FIXME: hardcoded assumption of S16_LE and 1 channel
+  // for the first frame.   FIXME: hardcoded assumption of S16_LE
 
-  lastFrameTimestamp = (len - 2) / (2.0 * rate) + timestamp;
+  lastFrameTimestamp = (len - 2 * channels) / (2.0 * channels * rate) + timestamp;
 
   bool rv = Pollable::queueOutput(p, len);
 
   if (pollfd.fd < 0)
-    openOutputFile(lastFrameTimestamp - outputBuffer.size() / (2.0 * rate));    
+    openOutputFile(lastFrameTimestamp - outputBuffer.size() / (2.0 * channels * rate));    
 
   return rv;
 };
@@ -131,7 +132,7 @@ void WavFileWriter::doneOutputFile(int err) {
     close(pollfd.fd);
     pollfd.fd = -1;
     ++totalFilesWritten;
-    prevSecondsWritten = (bytesToWrite - byteCountdown) / (2.0 * rate); // FIXME: hardwired S16_LE mono format 
+    prevSecondsWritten = (bytesToWrite - byteCountdown) / (2.0 * channels * rate); // FIXME: hardwired S16_LE format 
     totalSecondsWritten += prevSecondsWritten;
   }
   requestPollFDRegen();
@@ -205,9 +206,9 @@ string WavFileWriter::toJSON() {
     << ",\"port\":\"" << portLabel
     << "\",\"fileDescriptor\":" << pollfd.fd
     << ",\"fileName\":\"" << (char *) filename
-    << "\",\"framesWritten\":" << (uint32_t) ((bytesToWrite - byteCountdown) / 2)
+    << "\",\"framesWritten\":" << (uint32_t) ((bytesToWrite - byteCountdown) / (2 * channels))
     << ",\"framesToWrite\":" << framesToWrite
-    << ",\"secondsWritten\":"  << std::setprecision(16) << ((bytesToWrite - byteCountdown) / (2.0 * rate))   
+    << ",\"secondsWritten\":"  << std::setprecision(16) << ((bytesToWrite - byteCountdown) / (2.0 * rate * channels))   
     << ",\"secondsToWrite\":" << framesToWrite / (double) rate
     << ",\"totalFilesWritten\":" << totalFilesWritten
     << ",\"totalSecondsWritten\":" << totalSecondsWritten
