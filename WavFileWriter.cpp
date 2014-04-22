@@ -66,6 +66,14 @@ bool WavFileWriter::queueOutput(const char *p, uint32_t len, double timestamp) {
   if (pollfd.fd < 0)
     openOutputFile(lastFrameTimestamp - outputBuffer.size() / (2.0 * channels * rate));    
 
+  // only set this fd up for output polling if there's MIN_WRITE_SIZE data
+  // otherwise, we're calling write() much too often
+
+  if ((int) outputBuffer.size() >= MIN_WRITE_SIZE || byteCountdown < MIN_WRITE_SIZE)
+    pollfd.events |= POLLOUT;
+  else
+    pollfd.events &= ~POLLOUT;
+
   return rv;
 };
 
@@ -170,16 +178,11 @@ void WavFileWriter::handleEvents (struct pollfd *pollfds, bool timedOut, double 
       }
       return;
     }
-    // if there's raw output to send, send as much as we might still need
-    // but only send 64K at a time, unless there's less than 64K left on
-    // the current countdown
     int len = outputBuffer.size();
-    if (len >= MIN_WRITE_SIZE || byteCountdown < MIN_WRITE_SIZE) {
-      int nb = writeSomeOutput(std::min(byteCountdown, len));
-      byteCountdown -= nb;
-      if (nb < 0 || byteCountdown == 0)
-        doneOutputFile();
-    }
+    int nb = writeSomeOutput(std::min(byteCountdown, len));
+    byteCountdown -= nb;
+    if (nb < 0 || byteCountdown == 0)
+      doneOutputFile();
   }
 };
 
