@@ -22,8 +22,8 @@ typedef std::map < string, weak_ptr < PluginRunner > > PluginRunnerSet;
 class AlsaMinder : public Pollable {
 public:
 
-  static const int  PERIOD_FRAMES         = 2400;   // 50 ms
-  static const int  BUFFER_FRAMES         = 131072; // 128K appears to be max buffer size in frames; this is 2.73 seconds
+  static const int  PERIOD_FRAMES         = 4800;   // 40 periods per second for FCD Pro +; 20 periods per second for FCD Pro
+  static const int  BUFFER_FRAMES         = 131072; // 128K appears to be max buffer size in frames; this is 0.683 s for FCD Pro+, 1.365 s for FCD Pro
   static const int  MAX_AUDIO_QUIET_TIME  = 30;     // 30 second maximum quiet time before we decide an audio data stream is dry and try restart it
   static const int  MAX_CHANNELS          = 2;      // maximum of two channels per device
     

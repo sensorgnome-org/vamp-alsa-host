@@ -20,6 +20,7 @@ int AlsaMinder::open() {
   snd_pcm_hw_params_t *params;
   snd_pcm_sw_params_t *swparams;
   snd_pcm_access_mask_t *mask;
+  snd_pcm_uframes_t boundary;
 
   snd_pcm_hw_params_alloca( & params);
   snd_pcm_sw_params_alloca( & swparams);
@@ -44,6 +45,9 @@ int AlsaMinder::open() {
       || snd_pcm_sw_params_current(pcm, swparams)
       || snd_pcm_sw_params_set_tstamp_mode(pcm, swparams, SND_PCM_TSTAMP_ENABLE)
       || snd_pcm_sw_params_set_period_event(pcm, swparams, 1)
+      // get the ring buffer boundary, and 
+      || snd_pcm_sw_params_get_boundary	(swparams, &boundary)
+      || snd_pcm_sw_params_set_stop_threshold (pcm, swparams, boundary)
       || snd_pcm_sw_params(pcm, swparams)
       || (numFD = snd_pcm_poll_descriptors_count (pcm)) < 0
 
@@ -212,28 +216,12 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
   } else {            
     revents = 0;
   }
-
-  if (revents & POLLERR) {
-    hasError = errno;
-    stopped = true;
-    Pollable::requestPollFDRegen();
-    stop(timeNow);
-    if (start(timeNow)) {
-      std::ostringstream msg;
-      msg << "{\"event\":\"devStalled\",\"devLabel\":\"" << label << "\",\"error\":\"poll return with POLLERR and errno=" << errno << "\"}\n";
-      Pollable::asyncMsg(msg.str());
-    }
-    return;
-  }
   if (revents & (POLLIN | POLLPRI)) {
     // copy as much data as possible from mmap ring buffer
     // and inform any pluginRunners that we have data
 
     snd_pcm_sframes_t avail = snd_pcm_avail_update (pcm);
     if (avail < 0) {
-      std::ostringstream msg;
-      msg << "{\"event\":\"devStalled\",\"error\":\"snd_pcm_avail_update() when POLLIN|POLLPRI was true returned with error " << -avail << "\",\"devLabel\":\"" << label << "\"}\n";
-      Pollable::asyncMsg(msg.str());
       snd_pcm_recover(pcm, avail, 1);
       snd_pcm_prepare(pcm);
       hasError = 0;
@@ -297,7 +285,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
             rawSamples[i] = roundf(dthetaScale * dtheta);
           }
         } else {
-          for (int i=0; i < avail * numChan; ++i) {
+          for (unsigned i=0; i < avail * numChan; ++i) {
             rawSamples[i] = *src0;
             //            src0 += step;
             ++src0;
@@ -308,10 +296,10 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         // we downsample in-place, keeping track of the destination
         // index in downSampleAvail;
 
-        int downSampleAvail;
+        int downSampleAvail = avail;
 
         if (downSampleFactor > 1) {
-          for (int j = 0; j < numChan; ++j) {
+          for (unsigned j = 0; j < numChan; ++j) {
             int16_t * rs = & rawSamples[j];
             downSampleAvail = 0; // works the same for all channels
             for (int i=0; i < avail; ++i) {
@@ -326,8 +314,6 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
               }
             }
           }
-        } else {
-          downSampleAvail = avail;
         }
 
         // there are now downSampleAvail samples, stored in rawSamples[0..downSampleAvail * numChan - 1]
@@ -389,11 +375,10 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
   } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_AUDIO_QUIET_TIME) {
     // this device appears to have stopped delivering audio; try restart it
     std::ostringstream msg;
-    msg << "{\"event\":\"buffer overflow?\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs; restarting\",\"devLabel\":\"" << label << "\"}\n";
+    msg << "{\"event\":\"devStalled\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs;\",\"devLabel\":\"" << label << "\"}\n";
     Pollable::asyncMsg(msg.str());
     lastDataReceived = timeNow; // wait before next restart
     stop(timeNow);
-    start(timeNow);
     Pollable::requestPollFDRegen();
   }
 };
