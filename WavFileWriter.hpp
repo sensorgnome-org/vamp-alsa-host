@@ -18,7 +18,7 @@ class WavFileWriter : public Pollable {
 protected:
   string portLabel; // label of port device is attached to
   static const unsigned OUTPUT_BUFFER_SIZE = 16777216; // 16 M output buffer
-
+  static const unsigned MIN_WRITE_SIZE = 65536; // don't call write() with less than this number of bytes, unless file remainder is smaller
   //  boost::circular_buffer < char > outputBuffer;  // output data waiting to be written to file
   string pathTemplate; // template of full path to output file, with %s replaced by date/time of first sample
   int32_t framesToWrite; // number of frames to write to file

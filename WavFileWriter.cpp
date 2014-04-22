@@ -171,12 +171,15 @@ void WavFileWriter::handleEvents (struct pollfd *pollfds, bool timedOut, double 
       return;
     }
     // if there's raw output to send, send as much as we might still need
-
+    // but only send 64K at a time, unless there's less than 64K left on
+    // the current countdown
     int len = outputBuffer.size();
-    int nb = writeSomeOutput(std::min(byteCountdown, len));
-    byteCountdown -= nb;
-    if (nb < 0 || byteCountdown == 0)
-      doneOutputFile();
+    if (len >= MIN_WRITE_SIZE || byteCountdown < MIN_WRITE_SIZE) {
+      int nb = writeSomeOutput(std::min(byteCountdown, len));
+      byteCountdown -= nb;
+      if (nb < 0 || byteCountdown == 0)
+        doneOutputFile();
+    }
   }
 };
 
