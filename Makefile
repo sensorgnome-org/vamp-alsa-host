@@ -47,6 +47,9 @@ vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o Plugi
 vamp-host: vamp-host.o
 	g++  -o $@ $^ -lvamp-hostsdk -lsndfile -ldl
 
+vamp-host: vamp-host.o
+	g++  -o $@ $^ -lvamp-hostsdk -lsndfile -ldl
+
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
 AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
