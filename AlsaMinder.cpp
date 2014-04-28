@@ -301,6 +301,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         if (downSampleFactor > 1) {
           for (unsigned j = 0; j < numChan; ++j) {
             int16_t * rs = & rawSamples[j];
+            int16_t * ds = rs;
             downSampleAvail = 0; // works the same for all channels
             for (int i=0; i < avail; ++i) {
               downSampleAccum[j] += *rs;
@@ -309,8 +310,10 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
                 downSampleCount[j] = downSampleFactor;
                 // simple dithering: round to nearest int, but retain remainder in downSampleAccum
                 int16_t downSample = (downSampleAccum[j] + downSampleFactor / 2) / downSampleFactor;
-                rawSamples[downSampleAvail++] = downSample;
+                *ds = downSample;
                 downSampleAccum[j] -= downSample * downSampleFactor;
+                ds += numChan;
+                ++ downSampleAvail;
               }
             }
           }
