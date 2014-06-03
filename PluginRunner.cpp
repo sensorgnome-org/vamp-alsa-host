@@ -84,32 +84,16 @@ int PluginRunner::loadPlugin() {
     return 4;
   }
 
-  // if the plugin has a parameter named isForVampAlsaHost, set it to 1.  This allows
-  // a plugin to e.g. produce different output depending on whether it is run with
-  // vamp-alsa-host or audacity (e.g. FindLotekPulse generates gap size labels when
-  // run with audacity, not with vamp-alsa-host)
+  // Try set a plugin parameter called "__batch_host__" to 1.
+  // This allows a plugin to e.g. produce different output depending
+  // on whether it is run with vamp-alsa-host or audacity
+  // (e.g. gap size labels when run with audacity, not with vamp-alsa-host)
 
-  // if the plugin has a parameter named isOutputBinary that is quantized with one value
-  // then set isOutputBinary to true.  This means we don't have to discard old buffered
-  // output line-by-line as we would with text.
+  // The plugin should not advertise this parameter via its getParameterDescriptors()
+  // list, but just accept it when set.  Hopefully, other plugins ignore names
+  // of unknown parameters.
 
-  // if the plugin has a parameter named maxBinaryOutputSize that is quantized with one
-  // value, then set MAX_BUFFER_SIZE to that value.  Output from each call to the plugin's
-  // process() method is guaranteed to be no larger than MAX_BUFFER_SIZE bytes.
-
-  PluginBase::ParameterList plist = plugin->getParameterDescriptors();
-  for (PluginBase::ParameterList::iterator ipa = plist.begin(); ipa != plist.end(); ++ipa) {
-    if (ipa->identifier == "isForVampAlsaHost") {
-      plugin->setParameter(ipa->identifier, 1.0);
-    } else if (ipa->identifier == "isOutputBinary" && ipa->isQuantized &&
-               ipa->minValue == ipa->maxValue) {
-      isOutputBinary = true;
-    } else if (ipa->identifier == "maxBinaryOutputSize" && ipa->isQuantized &&
-               ipa->minValue == ipa->maxValue) {
-      isOutputBinary = true;
-    }
-
-  }
+  plugin->setParameter("__batch_host__", 1.0);
         
   return 0;
 };
@@ -268,6 +252,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
   totalFeatures += features[outputNo].size();
   for (Plugin::FeatureList::iterator f = features[outputNo].begin(), g = features[outputNo].end(); f != g; ++f ) {
     if (isOutputBinary) {
+      // NOTHING USES THIS CLAUSE RIGHT NOW (JMB 2014-06-03)
       // copy values as raw bytes to any outputListeners
       for (OutputListenerSet::iterator io = outputListeners.begin(); io != outputListeners.end(); /**/) {
         if (shared_ptr < Pollable > ptr = (io->second).lock()) {
