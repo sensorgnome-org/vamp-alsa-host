@@ -89,12 +89,8 @@ int PluginRunner::loadPlugin() {
   // on whether it is run with vamp-alsa-host or audacity
   // (e.g. gap size labels when run with audacity, not with vamp-alsa-host)
 
-  // The plugin should not advertise this parameter via its getParameterDescriptors()
-  // list, but just accept it when set.  Hopefully, other plugins ignore names
-  // of unknown parameters.
+  plugin->setParameter("__batch_host__", 1);
 
-  plugin->setParameter("__batch_host__", 1.0);
-        
   return 0;
 };
 
