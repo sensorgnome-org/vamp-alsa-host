@@ -344,6 +344,8 @@ int runPlugin(string myname, string soname, string id,
     for (size_t i=0; i < paramNames.size(); ++i)
         plugin->setParameter(paramNames[i], paramValues[i]);
 
+    plugin->setParameter("__batch_host__", 1);
+
     cerr << "Running plugin: \"" << plugin->getIdentifier() << "\"..." << endl;
 
     // Note that the following would be much simpler if we used a
