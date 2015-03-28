@@ -35,7 +35,8 @@ public:
 
   void setRawOutput(bool yesno);
 
-  static const int RAW_OUTPUT_BUFFER_SIZE = 256;    // size of buffer for receiving commands over TCP
+  static const int RAW_OUTPUT_BUFFER_SIZE = 524288;    // size of buffer for sending raw output over TCP; 
+  // needs to be large enough for a full buffer of output audio data (131072 frames x 2 channels x 2 bytes per channel)
 
 protected: 
   CommandHandler handler;
