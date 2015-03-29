@@ -26,6 +26,7 @@ TCPConnection::TCPConnection (int fd, string label, CommandHandler handler, bool
 
   pollfd.fd = fd;
   pollfd.events = POLLIN | POLLRDHUP;
+  outputBuffer = boost::circular_buffer < char > (RAW_OUTPUT_BUFFER_SIZE);
   if (! quiet)
     queueOutput(msg);
 };
