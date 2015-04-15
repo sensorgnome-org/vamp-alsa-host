@@ -15,7 +15,7 @@ void AlsaMinder::delete_privates() {
     
 int AlsaMinder::open() {
   // open the audio device and set our default audio parameters
-  // return 0 on success, 1 on error;
+  // return 0 on success, non-zero on error;
 
   snd_pcm_hw_params_t *params;
   snd_pcm_sw_params_t *swparams;
@@ -37,9 +37,18 @@ int AlsaMinder::open() {
       || snd_pcm_hw_params_set_format(pcm, params, SND_PCM_FORMAT_S16_LE)
       || snd_pcm_hw_params_set_channels(pcm, params, numChan)
       || snd_pcm_hw_params_set_rate_resample(pcm, params, 0)
-      || snd_pcm_hw_params_set_rate_last(pcm, params, & hwRate, & rateDir)
-      || hwRate % rate != 0 // we only do exact rate decimation
-      || snd_pcm_hw_params_set_period_size_near(pcm, params, & period_frames, 0) < 0
+      || snd_pcm_hw_params_set_rate_last(pcm, params, & hwRate, & rateDir))
+    return 1;
+
+  // do our best with the supplied rate:
+  // we use exact decimation to the closest rate, or the max if exceeded
+
+  if (hwRate > rate && hwRate % rate != 0)
+    rate = hwRate / (int) round((double)hwRate / rate); 
+  else if (rate > hwRate)
+    rate = hwRate;
+
+  if(snd_pcm_hw_params_set_period_size_near(pcm, params, & period_frames, 0) < 0
       || snd_pcm_hw_params_set_buffer_size_near(pcm, params, & buffer_frames) < 0
       || snd_pcm_hw_params(pcm, params)
       || snd_pcm_sw_params_current(pcm, swparams)
