@@ -387,7 +387,8 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
   } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_AUDIO_QUIET_TIME) {
     // this device appears to have stopped delivering audio; try restart it
     std::ostringstream msg;
-    msg << "{\"event\":\"devStalled\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs;\",\"devLabel\":\"" << label << "\"}\n";
+    // generate a JSON fragment, and send as async message to control socket
+    msg << "\"event\":\"devStalled\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs;\",\"devLabel\":\"" << label << "\"";
     Pollable::asyncMsg(msg.str());
     lastDataReceived = timeNow; // wait before next restart
     stop(timeNow);

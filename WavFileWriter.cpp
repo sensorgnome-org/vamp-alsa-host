@@ -146,10 +146,9 @@ void WavFileWriter::doneOutputFile(int err) {
   requestPollFDRegen();
 
   std::ostringstream msg;
-  msg << "{\"async\":true,\"event\":\"" << (err ? "rawFileError" : "rawFileDone") << "\",\"devLabel\":\"" << portLabel << "\"";
+  msg << "\"event\":\"" << (err ? "rawFileError" : "rawFileDone") << "\",\"devLabel\":\"" << portLabel << "\"";
   if (err)
     msg << ",\"errno\":" << err;
-  msg << "}\n";        
   Pollable::asyncMsg(msg.str());
   if (err) 
     Pollable::remove(label);

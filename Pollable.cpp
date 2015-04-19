@@ -186,8 +186,10 @@ void
 Pollable::asyncMsg(std::string msg) {
   // send an asynchronous message to the control TCP connection (the first tcp connection)
   Pollable *con = lookupByName(controlSocketLabel);
-  if (con)
+  if (con) {
+    msg = std::string("{") + msg + ", \"async\":true}\n";
     con->queueOutput(msg);
+  }
 }
 
 void

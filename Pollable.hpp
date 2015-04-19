@@ -49,7 +49,15 @@ protected:
   static bool doing_poll;
   static void doDeferrals();  
   static void regenFDs();
-  static void asyncMsg(std::string msg); // send an asynchronous message to the control TCP connection (the first tcp connection)
+
+  // send an asynchronous message to the control TCP connection (the
+  // first tcp connection); msg should a JSON fragment: i.e. a JSON
+  // string without the outermost set of '{', '}'.  This method
+  // adds the field "async": "bool" to the string, wraps it in '{}'
+  // and sends it to the control socket
+
+  static void asyncMsg(std::string msg); 
+
   static string controlSocketLabel;
 
   /* instance members */
