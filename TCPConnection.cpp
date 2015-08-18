@@ -30,6 +30,12 @@ TCPConnection::TCPConnection (int fd, string label, CommandHandler handler, bool
     queueOutput(msg);
 };
 
+TCPConnection::~TCPConnection ()
+{
+  close (pollfd.fd);
+  pollfd.fd = -1;
+};
+
 int TCPConnection::getNumPollFDs() {
   return 1;
 };
@@ -55,10 +61,17 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
     // handle read 
     int len = read(pollfd.fd, cmdString, VampAlsaHost::MAX_CMD_STRING_LENGTH);
     if (len <= 0) {
+      // socket has been closed, apparently.
+
+      // Remove this object from the pollables set.
+
+      // This will call its destructor, which as of 2015-08-18, closes
+      // the fd.  Fixes longstanding issue of not closing
+      // TCPConnection fds, which was exposed by the catastrophic
+      // fcd-watchdog software update of 28 July 2015.
+
       remove(label);
       requestPollFDRegen();
-      // socket has been closed, apparently
-      // FIXME: delete this connection via shared_ptr in connections
       return;
     }
     cmdString[len] = '\0';

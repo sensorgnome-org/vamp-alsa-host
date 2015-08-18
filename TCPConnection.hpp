@@ -21,6 +21,8 @@ public:
 
   TCPConnection (int fd, string label, CommandHandler handler, bool quiet, double timeNow);
   
+  ~TCPConnection();
+
   int getNumPollFDs();
 
   int getPollFDs (struct pollfd * pollfds);
