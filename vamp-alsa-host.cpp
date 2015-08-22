@@ -186,11 +186,10 @@ usage(string name) {
 
 void terminate (int p) 
 {
-    static bool terminating = false;
     
-    if (terminating)
+    if (Pollable::terminating)
         return;
-    terminating = true;
+    Pollable::terminating = true;
     delete host;
     std::cerr << "vamp-alsa-host terminating with code " << p << std::endl;
     std::cerr.flush();

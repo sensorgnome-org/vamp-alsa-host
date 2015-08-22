@@ -31,8 +31,9 @@ public:
 
   static const unsigned DEFAULT_OUTPUT_BUFFER_SIZE = 16384; // default size of output buffer; subclasses may request larger 
 
+  static bool terminating; // if true, don't call e.g. map functions from destructors of element maps!
   static PollableSet pollables; // map of Pollables, indexed by label, values are shared pointers
-  static void remove(const string& label);
+  static void remove(const string label);
   static Pollable * lookupByName (const std::string& label);
   static shared_ptr < Pollable > lookupByNameShared (const std::string& label);
   static void requestPollFDRegen();
@@ -56,7 +57,7 @@ protected:
 
 public:
 
-  Pollable(const string & label);
+  Pollable(const string label);
 
   virtual ~Pollable();
 

@@ -1,7 +1,7 @@
 #include "Pollable.hpp"
 #include <stdint.h>
 
-Pollable::Pollable(const std::string& label) : 
+Pollable::Pollable(const std::string label) : 
   label(label), 
   indexInPollFD(-1),
   outputBuffer(DEFAULT_OUTPUT_BUFFER_SIZE)
@@ -16,7 +16,9 @@ Pollable::~Pollable() {
 };
 
 void 
-Pollable::remove(const std::string& label) {
+Pollable::remove(const std::string label) {
+  if (Pollable::terminating)
+    return;
   if (! pollables.count(label))
     return;
   shared_ptr < Pollable > p = pollables[label];
@@ -213,5 +215,6 @@ std::vector < std::string > Pollable::deferred_removes;
 bool Pollable::regen_pollfds = true;
 bool Pollable::have_deferrals = false;
 bool Pollable::doing_poll = false;
+bool Pollable::terminating = false;
 string Pollable::controlSocketLabel = "";
 
