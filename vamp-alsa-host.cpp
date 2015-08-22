@@ -203,8 +203,7 @@ main(int argc, char **argv)
         COMMAND_HELP = 'h',
         COMMAND_SOCKET_NAME = 's',
         COMMAND_QUIET = 'q'
-
-    };
+  };
 
     int option_index;
     static const char short_options[] = "hs:q";

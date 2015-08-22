@@ -6,6 +6,8 @@ void AlsaMinder::delete_privates() {
     snd_pcm_close(pcm);
     pcm = 0;
   }
+  if (Pollable::terminating)
+    return;
   for (PluginRunnerSet::iterator ip = plugins.begin(); ip != plugins.end(); /**/) {
     Pollable::remove(ip->first);
     PluginRunnerSet::iterator del = ip++;
@@ -196,7 +198,7 @@ int AlsaMinder::getPollFDs (struct pollfd *pollfds) {
   if (pcm && shouldBeRunning) {
     if (numFD != snd_pcm_poll_descriptors(pcm, pollfds, numFD)) {
       std::ostringstream msg;
-      msg << "{\"event\":\"devProblem\",\"error\":\"snd_pcm_poll_descriptors returned error.\",\"devLabel\":\"" << label << "\"}\n";
+      msg << "\"event\":\"devProblem\",\"error\":\"snd_pcm_poll_descriptors returned error.\",\"devLabel\":\"" << label << "\"";
       Pollable::asyncMsg(msg.str());
       return 1;
     }
@@ -247,7 +249,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
       int errcode;
       if ((errcode = snd_pcm_mmap_begin (pcm, & areas, & offset, & have))) {
         std::ostringstream msg;
-        msg << "{\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_begin returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"}\n";
+        msg << "\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_begin returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"";
         Pollable::asyncMsg(msg.str());
         return;
       }
@@ -371,14 +373,14 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
 
       if (0 > snd_pcm_mmap_commit (pcm, offset, avail)) {
         std::ostringstream msg;
-        msg << "{\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_commit returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"}\n";
+        msg << "\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_commit returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"";
         Pollable::asyncMsg(msg.str());
       }
     }
   } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_AUDIO_QUIET_TIME) {
     // this device appears to have stopped delivering audio; try restart it
     std::ostringstream msg;
-    msg << "{\"event\":\"devStalled\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs;\",\"devLabel\":\"" << label << "\"}\n";
+    msg << "\"event\":\"devStalled\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs;\",\"devLabel\":\"" << label << "\"";
     Pollable::asyncMsg(msg.str());
     lastDataReceived = timeNow; // wait before next restart
     stop(timeNow);

@@ -1,6 +1,8 @@
 #include "PluginRunner.hpp"
 
 void PluginRunner::delete_privates() {
+  if (Pollable::terminating)
+    return;
   if (plugin) {
     delete plugin;
   }
