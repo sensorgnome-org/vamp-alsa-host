@@ -80,13 +80,13 @@ int AlsaMinder::do_start(double timeNow) {
     return 1;
   Pollable::requestPollFDRegen();
   snd_pcm_prepare(pcm);
-  hasError = 0;
-  snd_pcm_start(pcm);
-  stopped = false;
-  // set timestamps to:
-  // - prevent warning about resuming after long pause
-  // - allow us to notice no data has been received for too long after startup
-  lastDataReceived = startTimestamp = timeNow; 
+  if (! (hasError = snd_pcm_start(pcm)) ) {
+    stopped = false;
+    // set timestamps to:
+    // - prevent warning about resuming after long pause
+    // - allow us to notice no data has been received for too long after startup
+    lastDataReceived = startTimestamp = timeNow; 
+  }
   return 0;
 }
 
