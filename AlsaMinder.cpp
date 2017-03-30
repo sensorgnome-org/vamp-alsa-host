@@ -14,7 +14,7 @@ void AlsaMinder::delete_privates() {
     plugins.erase(del);
   }
 };
-    
+
 int AlsaMinder::open() {
   // open the audio device and set our default audio parameters
   // return 0 on success, 1 on error;
@@ -27,7 +27,7 @@ int AlsaMinder::open() {
   snd_pcm_hw_params_alloca( & params);
   snd_pcm_sw_params_alloca( & swparams);
   snd_pcm_access_mask_alloca( & mask );
-        
+
   snd_pcm_access_mask_none( mask);
   snd_pcm_access_mask_set( mask, SND_PCM_ACCESS_MMAP_INTERLEAVED);
 
@@ -46,8 +46,11 @@ int AlsaMinder::open() {
       || snd_pcm_hw_params(pcm, params)
       || snd_pcm_sw_params_current(pcm, swparams)
       || snd_pcm_sw_params_set_tstamp_mode(pcm, swparams, SND_PCM_TSTAMP_ENABLE)
+#ifdef RPI
+      || snd_pcm_sw_params_set_tstamp_type(pcm, swparams, SND_PCM_TSTAMP_TYPE_GETTIMEOFDAY)
+#endif
       || snd_pcm_sw_params_set_period_event(pcm, swparams, 1)
-      // get the ring buffer boundary, and 
+      // get the ring buffer boundary, and
       || snd_pcm_sw_params_get_boundary	(swparams, &boundary)
       || snd_pcm_sw_params_set_stop_threshold (pcm, swparams, boundary)
       || snd_pcm_sw_params(pcm, swparams)
@@ -55,7 +58,7 @@ int AlsaMinder::open() {
 
       ) {
     return 1;
-  } 
+  }
   return 0;
 };
 
@@ -85,7 +88,7 @@ int AlsaMinder::do_start(double timeNow) {
     // set timestamps to:
     // - prevent warning about resuming after long pause
     // - allow us to notice no data has been received for too long after startup
-    lastDataReceived = startTimestamp = timeNow; 
+    lastDataReceived = startTimestamp = timeNow;
   }
   return 0;
 }
@@ -100,12 +103,12 @@ void AlsaMinder::addPluginRunner(std::string &label, shared_ptr < PluginRunner >
 };
 
 void AlsaMinder::removePluginRunner(std::string &label) {
-  // remove plugin runner 
+  // remove plugin runner
   plugins.erase(label);
 };
 
 void AlsaMinder::addRawListener(string &label, int downSampleFactor, bool writeWavHeader) {
-  
+
   shared_ptr < Pollable > sptr;
   rawListeners[label] = sptr = Pollable::lookupByNameShared(label);
   if (rawListeners.size() == 1) {
@@ -172,7 +175,7 @@ string AlsaMinder::about() {
 
 string AlsaMinder::toJSON() {
   ostringstream s;
-  s << "{" 
+  s << "{"
     << "\"type\":\"AlsaMinder\","
     << "\"device\":\"" << alsaDev << "\","
     << "\"rate\":" << rate << ","
@@ -215,7 +218,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
     if (rv != 0) {
       throw std::runtime_error(about() + ": snd_pcm_poll_descriptors_revents returned error.\n");
     }
-  } else {            
+  } else {
     revents = 0;
   }
   if (revents & (POLLIN | POLLPRI)) {
@@ -254,7 +257,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         return;
       }
       avail = have;
-   
+
       totalFrames += avail;
       int16_t *src0, *src1=0; // avoid compiler warning
       int step;
@@ -346,7 +349,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
         src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
         step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
         src0 += step * offset;
-                    
+
         if (numChan == 2) {
           src1 = (int16_t *) (((unsigned char *) areas[1].addr) + areas[1].first / 8);
           src1 += step * offset;
@@ -387,7 +390,7 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
     Pollable::requestPollFDRegen();
   }
 };
-        
+
 void
 AlsaMinder::setDemodFMForRaw(bool demod) {
   demodFMForRaw = demod;
