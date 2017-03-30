@@ -3,7 +3,7 @@
 
 string TCPConnection::toJSON() {
   ostringstream s;
-  s << "{" 
+  s << "{"
     << "\"type\":\"TCPConnection\""
     << ",\"fileDescriptor\":" << pollfd.fd
     << ",\"timeConnected\":" << std::setprecision(14) << timeConnected
@@ -11,7 +11,7 @@ string TCPConnection::toJSON() {
   return s.str();
 };
 
-TCPConnection::TCPConnection (int fd, string label, CommandHandler handler, bool quiet, double timeNow) : 
+TCPConnection::TCPConnection (int fd, string label, CommandHandler handler, bool quiet, double timeNow) :
   Pollable(label),
   handler(handler),
   timeConnected(timeNow)
@@ -26,6 +26,7 @@ TCPConnection::TCPConnection (int fd, string label, CommandHandler handler, bool
 
   pollfd.fd = fd;
   pollfd.events = POLLIN | POLLRDHUP;
+  outputBuffer = boost::circular_buffer < char > (RAW_OUTPUT_BUFFER_SIZE);
   if (! quiet)
     queueOutput(msg);
 };
@@ -39,7 +40,7 @@ TCPConnection::~TCPConnection ()
 int TCPConnection::getNumPollFDs() {
   return 1;
 };
-  
+
 int TCPConnection::getPollFDs (struct pollfd * pollfds) {
   * pollfds = pollfd;
   return 0;
@@ -58,7 +59,7 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
   }
 
   if (pollfds->revents & (POLLIN | POLLRDHUP)) {
-    // handle read 
+    // handle read
     int len = read(pollfd.fd, cmdString, VampAlsaHost::MAX_CMD_STRING_LENGTH);
     if (len <= 0) {
       // socket has been closed, apparently.
@@ -85,7 +86,7 @@ void TCPConnection::handleEvents (struct pollfd *pollfds, bool timedOut, double 
           inputBuff.erase(0, inputBuff.npos - VampAlsaHost::MAX_CMD_STRING_LENGTH);
         return;
       }
-      
+
       // grab the full command
       string cmd(inputBuff.substr(0, pos));
       // drop it from the input buffer; note that since the newline is in the

@@ -20,7 +20,7 @@ public:
   string toJSON();
 
   TCPConnection (int fd, string label, CommandHandler handler, bool quiet, double timeNow);
-  
+
   ~TCPConnection();
 
   int getNumPollFDs();
@@ -28,7 +28,7 @@ public:
   int getPollFDs (struct pollfd * pollfds);
 
   int getOutputFD();
-    
+
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
   void stop(double timeNow);
@@ -37,9 +37,9 @@ public:
 
   void setRawOutput(bool yesno);
 
-  static const int RAW_OUTPUT_BUFFER_SIZE = 256;    // size of buffer for receiving commands over TCP
+  static const int RAW_OUTPUT_BUFFER_SIZE = 524288;    // size of buffer for receiving commands over TCP
 
-protected: 
+protected:
   CommandHandler handler;
 
 
