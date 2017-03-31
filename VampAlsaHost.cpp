@@ -5,7 +5,7 @@
 
 #include "VampAlsaHost.hpp"
 #include "Pollable.hpp"
-#include "AlsaMinder.hpp"
+#include "DevMinder.hpp"
 #include "PluginRunner.hpp"
 #include "WavFileWriter.hpp"
 #include <time.h>
@@ -26,7 +26,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
 
   if (! (cmd >> word))
     return reply.str();
-    
+
   if (word == "stopAll") {
     // quick stop of all devices
     for (PollableSet::iterator ips = Pollable::pollables.begin(); ips != Pollable::pollables.end(); ++ips) {
@@ -82,8 +82,8 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     path_template[0] = 0;
     cmd.ignore(MAX_CMD_STRING_LENGTH, '"');
     cmd.getline(path_template, MAX_CMD_STRING_LENGTH, '"');
-   
-    AlsaMinder *p = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(label));
+
+    DevMinder *p = dynamic_cast < DevMinder * > (Pollable::lookupByName(label));
     if (p) {
       if (word == "rawStream") {
         // set fm on/off and add a raw listener
@@ -120,7 +120,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
   } else if (word == "fmOn" || word == "fmOff") {
     string label;
     cmd >> label;
-    AlsaMinder *p = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(label));
+    DevMinder *p = dynamic_cast < DevMinder * > (Pollable::lookupByName(label));
     if (p) {
       p->setDemodFMForRaw(word == "fmOn");
     } else {
@@ -131,7 +131,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     int rate, numChan;
     cmd >> label >> alsaDev >> rate >> numChan;
     try {
-      AlsaMinder * ptr = new AlsaMinder(alsaDev, rate, numChan, label, realTimeNow);
+      DevMinder * ptr = new DevMinder(alsaDev, rate, numChan, label, realTimeNow);
       reply << ptr->toJSON() << '\n';
     } catch (std::runtime_error e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
@@ -139,7 +139,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
   } else if (word == "close") {
     string label;
     cmd >> label;
-    AlsaMinder *dev = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(label));
+    DevMinder *dev = dynamic_cast < DevMinder * > (Pollable::lookupByName(label));
     if (dev) {
       dev->stop(realTimeNow);
       reply << dev->toJSON() << '\n';
@@ -160,7 +160,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       ps[par] = val;
     }
     try {
-      AlsaMinder *dev = dynamic_cast < AlsaMinder * > (Pollable::lookupByName(devLabel));
+      DevMinder *dev = dynamic_cast < DevMinder * > (Pollable::lookupByName(devLabel));
       if (!dev)
         throw std::runtime_error(string("There is no device with label '") + devLabel + "'");
       if (Pollable::lookupByName(pluginLabel))
@@ -260,7 +260,7 @@ VampAlsaHost::now(bool is_monotonic) {
   return clockTime.tv_sec + clockTime.tv_nsec / (double) 1.0e9;
 };
 
-const string 
+const string
 VampAlsaHost::commandHelp =
           "       open DEV_LABEL AUDIO_DEV RATE NUM_CHANNELS\n"
           "          Opens an audio device so that plugins can be attached to it.\n"
@@ -318,11 +318,11 @@ VampAlsaHost::commandHelp =
           "       receiveAll\n"
           "          Start sending any output data for all currently attached plugins to the TCP connection from\n"
           "          which this command is issued.  Also, any plugins attached after this command is issued\n"
-          "          will also send output to the issuing TCP connection, unless a subsequent receiveAll command\n"  
+          "          will also send output to the issuing TCP connection, unless a subsequent receiveAll command\n"
           "          is issued from a different TCP connection.  This command does not affect any existing\n"
           "          connections already receiving data from an attached plugin.\n"
           "          Note: this command does not return a reply unless there is an error.\n\n"
-  
+
           "       rawStream DEV_LABEL RATE FRAMES\n"
           "          Write raw data to the TCP connection.\n"
           "          DEV_LABEL: the device from which to obtain raw data\n"
@@ -368,7 +368,7 @@ VampAlsaHost::commandHelp =
           "          Finally, this command only has effect on a stereo device, and will reduce\n"
           "          the raw output to a single channel.  This command is likely only to be\n"
           "          useful for radio receivers which output I/Q as stereo audio channels.\n\n"
-    
+
           "       fmOff DEV_LABEL\n"
           "          Turn off FM-demodulation for the specified device;  raw data will be sent\n"
           "          to any listening TCP connections as-is.\n"
@@ -403,10 +403,10 @@ VampAlsaHost::commandHelp =
 
           "       stopAll\n"
           "           Stop all devices, e.g. to allow changing settings on upstream devices.\n"
-        
+
           "       startAll\n"
           "           (Re-)start all devices (e.g. after a stopAll command).\n\n"
-        
+
           "       list\n"
           "           Return the status of all open audio devices and plugins.\n\n"
 

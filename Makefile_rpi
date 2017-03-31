@@ -17,6 +17,9 @@ install: vamp-alsa-host
 AlsaMinder.o: AlsaMinder.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
+DevMinder.o: DevMinder.cpp
+	g++ $(CCOPTS) -c -o $@ $<
+
 PluginRunner.o: PluginRunner.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
@@ -38,13 +41,15 @@ WavFileWriter.o: WavFileWriter.cpp
 vamp-alsa-host.o: vamp-alsa-host.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
-vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o PluginRunner.o VampAlsaHost.o AlsaMinder.o WavFileWriter.o
+vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o PluginRunner.o VampAlsaHost.o AlsaMinder.o WavFileWriter.o DevMinder.o
 	g++ $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk -lboost_filesystem -lboost_system -lboost_thread -lfftw3f
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
 AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
 AlsaMinder.o: ParamSet.hpp
+DevMinder.o: DevMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
+DevMinder.o: ParamSet.hpp
 PluginRunner.o: PluginRunner.hpp ParamSet.hpp Pollable.hpp VampAlsaHost.hpp
 PluginRunner.o: AlsaMinder.hpp
 TCPConnection.o: TCPConnection.hpp Pollable.hpp VampAlsaHost.hpp
