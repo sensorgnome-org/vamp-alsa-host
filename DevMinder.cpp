@@ -74,7 +74,7 @@ void DevMinder::addRawListener(string &label, int downSampleFactor, bool writeWa
   rawListeners[label] = sptr = Pollable::lookupByNameShared(label);
   if (rawListeners.size() == 1) {
     this->downSampleFactor = downSampleFactor;
-    this->downSampleUseAvg = true;
+    this->downSampleUseAvg = downSampleUseAvg;
     for (int i=0; i < MAX_CHANNELS; ++i) {
       downSampleAccum[i] = 0;
       downSampleCount[i] = downSampleFactor;
@@ -156,7 +156,8 @@ string DevMinder::toJSON() {
     << "\"stopTimestamp\":" << stopTimestamp << ","
     << "\"running\":" << (stopped ? "false" : "true") << ","
     << "\"hasError\":" << hasError << ","
-    << "\"totalFrames\":" << totalFrames
+    << "\"totalFrames\":" << totalFrames << ","
+    << "\"numRawListeners\":" << rawListeners.size()
     << "}";
   return s.str();
 }
