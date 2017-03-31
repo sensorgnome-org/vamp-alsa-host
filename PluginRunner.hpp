@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <set>
 #include <memory>
+#include <fftw3.h>
 
 using namespace Vamp;
 using namespace Vamp::HostExt;

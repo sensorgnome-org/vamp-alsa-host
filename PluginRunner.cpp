@@ -9,7 +9,7 @@ void PluginRunner::delete_privates() {
   if (plugbuf) {
     for (unsigned int i=0; i < numChan; ++i) {
       if (plugbuf[i])
-        delete [] plugbuf[i];
+        fftwf_free (plugbuf[i]);
     }
     delete [] plugbuf;
   }
@@ -59,7 +59,8 @@ int PluginRunner::loadPlugin() {
 
   plugbuf = new float*[numChan];
   for (unsigned c = 0; c < numChan; ++c)
-    plugbuf[c] = new float[blockSize + 2];  // FIXME: is "+2" only to leave room for DFT?
+    // use fftwf_alloc_real to make sure we have alignment suitable for in-place SIMD FFTs 
+    plugbuf[c] =  fftwf_alloc_real(blockSize + 2);  // FIXME: is "+2" only to leave room for DFT?; 
 
   // make sure the named output is valid
         
