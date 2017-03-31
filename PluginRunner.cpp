@@ -20,7 +20,7 @@ void PluginRunner::delete_privates() {
 int PluginRunner::loadPlugin() {
   // load the plugin, make sure it is compatible and that all parameters are okay.
 
-  // get an instance of the plugin loader, 
+  // get an instance of the plugin loader,
 
   if (! pluginLoader)
     pluginLoader =  PluginLoader::getInstance();
@@ -34,7 +34,7 @@ int PluginRunner::loadPlugin() {
   }
 
   // make sure the plugin is compatible: it must run in the time domain and accept an appropriate number of channels
-        
+
   if (plugin->getInputDomain() != Plugin::TimeDomain
       || plugin->getMinChannelCount() > numChan
       || plugin->getMaxChannelCount() < numChan) {
@@ -45,7 +45,7 @@ int PluginRunner::loadPlugin() {
 
   blockSize = plugin->getPreferredBlockSize();
   stepSize = plugin->getPreferredStepSize();
-        
+
   if (blockSize == 0) {
     blockSize = 1024;
   }
@@ -59,13 +59,13 @@ int PluginRunner::loadPlugin() {
 
   plugbuf = new float*[numChan];
   for (unsigned c = 0; c < numChan; ++c)
-    // use fftwf_alloc_real to make sure we have alignment suitable for in-place SIMD FFTs 
-    plugbuf[c] =  fftwf_alloc_real(blockSize + 2);  // FIXME: is "+2" only to leave room for DFT?; 
+    // use fftwf_alloc_real to make sure we have alignment suitable for in-place SIMD FFTs
+    plugbuf[c] =  fftwf_alloc_real(blockSize + 2);  // FIXME: is "+2" only to leave room for DFT?;
 
   // make sure the named output is valid
-        
+
   Plugin::OutputList outputs = plugin->getOutputDescriptors();
-        
+
   for (size_t i = 0; i < outputs.size(); ++i) {
     if (outputs[i].identifier == pluginOutput) {
       outputNo = i;
@@ -113,7 +113,7 @@ int PluginRunner::loadPlugin() {
     }
 
   }
-        
+
   return 0;
 };
 
@@ -159,7 +159,7 @@ PluginRunner::~PluginRunner() {
 };
 
 bool PluginRunner::addOutputListener(string label) {
-  
+
   shared_ptr < Pollable > outl = boost::static_pointer_cast < Pollable > (lookupByNameShared(label));
   if (outl) {
     outputListeners[label] = outl;
@@ -177,13 +177,13 @@ void PluginRunner::removeAllOutputListeners() {
   outputListeners.clear();
 };
 
-void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *src1, int step, double frameTimestamp) {
+void PluginRunner::handleData(long avail, int16_t *src0, int16_t *src1, int step, double frameTimestamp) {
   // alsaHandler has some data for us.  If src1 is NULL, it's only one channel; otherwise it's two channels
 
   int pfs0 = partialFrameSum[0];
   int pfs1 = partialFrameSum[1];
   int rc = resampleCountdown;
-  
+
   // get timestamp of first (hardware) frame in plugin's buffer
   frameTimestamp -= (double) framesInPlugBuf / rate + (double) (resampleDecim - rc) / hwRate;
 
@@ -230,7 +230,7 @@ void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *s
     totalFrames += decimated_frame_count;
     if (framesInPlugBuf == blockSize) {
       // time to call the plugin
-          
+
       RealTime rt = RealTime::fromSeconds( frameTimestamp );
       outputFeatures(plugin->process(plugbuf, rt), label);
 
@@ -267,7 +267,7 @@ void PluginRunner::handleData(snd_pcm_sframes_t avail, int16_t *src0, int16_t *s
 
 void
 PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
-{  
+{
   totalFeatures += features[outputNo].size();
   for (Plugin::FeatureList::iterator f = features[outputNo].begin(), g = features[outputNo].end(); f != g; ++f ) {
     if (isOutputBinary) {
@@ -325,7 +325,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
 
 string PluginRunner::toJSON() {
   ostringstream s;
-  s << "{" 
+  s << "{"
     << "\"type\":\"PluginRunner\","
     << "\"devLabel\":\"" << devLabel << "\","
     << "\"libraryName\":\"" << pluginSOName << "\","
@@ -369,7 +369,7 @@ PluginRunner::getNumPollFDs() {
   return 0;
 };
 
-int 
+int
 PluginRunner::getPollFDs (struct pollfd * pollfds) {
   /* do nothing */
   return 0;

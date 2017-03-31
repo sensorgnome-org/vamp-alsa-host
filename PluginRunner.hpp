@@ -20,8 +20,6 @@ using namespace Vamp::HostExt;
 
 typedef std::map < string, weak_ptr < Pollable > > OutputListenerSet;
 
-class AlsaMinder;
-
 class PluginRunner : public Pollable {
 public:
   string             label;            // name of this plugin runner (used in commands)
@@ -76,7 +74,7 @@ public:
                       // return number of fds used by this Pollable (negative means error)
   int getPollFDs (struct pollfd * pollfds);
 
-  int getOutputFD(){return 0;}; 
+  int getOutputFD(){return 0;};
 
   void handleEvents (struct pollfd *pollfds, bool timedOut, double timeNow);
 
@@ -89,8 +87,5 @@ public:
 private:
   void delete_privates();
 };
-
-
-#include "AlsaMinder.hpp"
 
 #endif // PLUGINRUNNER_HPP
