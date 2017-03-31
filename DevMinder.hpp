@@ -1,5 +1,5 @@
-#ifndef ALSAMINDER_HPP
-#define ALSAMINDER_HPP
+#ifndef DEVMINDER_HPP
+#define DEVMINDER_HPP
 
 #include <string>
 #include <stdexcept>
@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <memory>
 #include <cmath>
+#include <vector>
 
 using namespace std;
 
@@ -14,23 +15,17 @@ using namespace std;
 #include "PluginRunner.hpp"
 #include "WavFileHeader.hpp"
 
-// declarations of subclasses for factory method
-
-#include "AlsaMinder.hpp"
-#include "RTLSDRMinder.hpp"
-
 typedef std::map < string, weak_ptr < Pollable > > RawListenerSet;
 typedef std::map < string, weak_ptr < PluginRunner > > PluginRunnerSet;
 
 class DevMinder : public Pollable {
+
 public:
 
-  static const int  PERIOD_FRAMES         = 4800;   // 40 periods per second for FCD Pro +; 20 periods per second for FCD Pro
-  static const int  BUFFER_FRAMES         = 131072; // 128K appears to be max buffer size in frames; this is 0.683 s for FCD Pro+, 1.365 s for FCD Pro
-  static const int  MAX_AUDIO_QUIET_TIME  = 30;     // 30 second maximum quiet time before we decide an audio data stream is dry and try restart it
   static const int  MAX_CHANNELS          = 2;      // maximum of two channels per device
+  static const int  MAX_DEV_QUIET_TIME   = 30;     // 30 second maximum quiet time before we decide an device data stream is dry and try restart it
 
-  string             devName;          // path to device (e.g. hw:CARD=V10 for ALSA, or rtlsdr-1:3 for rtlsdr with usb bus:dev = 1:3)
+  string             devName;          // path to device (e.g. hw:CARD=V10 for ALSA, or rtlsdr:/tmp/rtlsdr1:3 for rtl_tcp listening on /tmp/rtlsdr1:3
   int                rate;             // sampling rate to supply plugins with
   unsigned int       hwRate;           // sampling rate of hardware device
   unsigned int       numChan;          // number of channels to read from device
@@ -40,7 +35,6 @@ protected:
   PluginRunnerSet   plugins;          // set of plugins accepting input from this device
   RawListenerSet    rawListeners;     // listeners receiving raw output from this device, if
                                       // any.
-  unsigned short    revents;          // demangled version of revent returned after poll()
   long long         totalFrames;      // total frames seen on this device since start of capture
   double            startTimestamp;   // timestamp device was (most recently) started (-1 if
                                       // never)
@@ -55,8 +49,6 @@ protected:
                                       // streaming USB audio)
   int               hasError;         // if non-zero, the most recent error this device got
                                       // while we polled it? (this would have stopped it)
-  int               numFD;            // number of file descriptors required for polling on this
-                                      // device
   bool              demodFMForRaw;    // if true, any rawListeners receive FM-demodulated
                                       // samples (reducing stereo to mono)
   float             demodFMLastTheta; // value of previous phase angle for FM demodulation (in
@@ -66,49 +58,63 @@ protected:
   int32_t           downSampleAccum[MAX_CHANNELS];  // accumulator for downsampling
   bool              downSampleUseAvg; // if true, downsample by averaging; else downsample by subsampling
 
-private
-        DevMinder();
+  std::vector < int16_t > sampleBuf;  // buffer to store latest interleaved samples from device
 
 public:
 
-  int open();
+  static DevMinder * getDevMinder(const string &devName, int rate, unsigned int numChan, const string &label, double now); // factory method
+  ~DevMinder();
+
+  int open(); // return 0 on success, non-zero on error
+  virtual int hw_open() =0 ; // return 0 on success, non-zero on error
+
+  virtual bool hw_is_open() = 0;
+
   void addPluginRunner(std::string &label, shared_ptr < PluginRunner > pr);
   void removePluginRunner(std::string &label);
   void addRawListener(string &label, int downSampleFactor, bool writeWavHeader = false, bool downSampleUseAvg = true);
   void removeRawListener(string &label);
   void removeAllRawListeners();
 
-  DevMinder * getDevMinder(const string &devName, int rate, unsigned int numChan, const string &label, double now); // factory method
-
-  ~DevMinder();
-
   string about();
-
   string toJSON();
 
   virtual int getNumPollFDs ();
+  virtual int hw_getNumPollFDs () = 0;
 
-  virtual int getPollFDs (struct pollfd *pollfds);
+  virtual int getPollFDs (struct pollfd *pollfds); // return 0 on sucess; non-zero on error
+  virtual int hw_getPollFDs (struct pollfd *pollfds) = 0; // return 0 on success; non-zero on error
 
-  int getOutputFD(){return 0;};
+  int getOutputFD(){return 0;}; // this kind of Pollable has no output FDs
 
   virtual void handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow);
-  virtual void hw_handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow);
+  virtual int hw_handleEvents ( struct pollfd *pollfds, bool timedOut) = 0; // returns number of frames of data available (possibly 0)
+
+  virtual int hw_getFrames (int16_t *buf, int numFrames, double & frameTimestamp) = 0;  // fill buffer buf with frame data (interleaved by channel); returns # of frames copied
+  // it is guaranteed that whenever hw_handleEvents returns a positive number N, hw_getFrames will be called with numFrames=N
+  // also returns CLOCK_REALTIME for first frame in frameTimestamp
+  // negative return value is an error code.
+
   int start(double timeNow);
   void stop(double timeNow);
   void setDemodFMForRaw(bool demod);
 
 protected:
 
+  DevMinder(const string &devName, int rate, unsigned int numChan, const string &label, double now, int buffSize); // buffSize is in frames.
+
   void delete_privates();
-  virtual void hw_delete_privates();
+  virtual void hw_delete_privates() = 0;
 
   int do_start(double timeNow);
-  virtual void hw_do_start();
+  virtual int hw_do_start() = 0;      // returns 0 on success; non-zero otherwise
+
+  int do_restart(double timeNow);
+  virtual int hw_do_restart() = 0;    // returns 0 on success; non-zero otherwise
 
   void do_stop(double timeNow);
-  virtual void hw_do_stop();
+  virtual int hw_do_stop() = 0;       // returns 0 on success; non-zero otherwise
 
 };
 
-#endif // ALSAMINDER_HPP
+#endif // DEVMINDER_HPP

@@ -1,21 +1,14 @@
 #include "AlsaMinder.hpp"
 
-void AlsaMinder::delete_privates() {
+void AlsaMinder::hw_delete_privates() {
   if (pcm) {
     snd_pcm_drop(pcm);
     snd_pcm_close(pcm);
     pcm = 0;
   }
-  if (Pollable::terminating)
-    return;
-  for (PluginRunnerSet::iterator ip = plugins.begin(); ip != plugins.end(); /**/) {
-    Pollable::remove(ip->first);
-    PluginRunnerSet::iterator del = ip++;
-    plugins.erase(del);
-  }
 };
 
-int AlsaMinder::open() {
+int AlsaMinder::hw_open() {
   // open the audio device and set our default audio parameters
   // return 0 on success, 1 on error;
 
@@ -33,7 +26,7 @@ int AlsaMinder::open() {
 
   int rateDir = 1;
 
-  if ((snd_pcm_open(& pcm, alsaDev.c_str(), SND_PCM_STREAM_CAPTURE, 0))
+  if ((snd_pcm_open(& pcm, devName.c_str(), SND_PCM_STREAM_CAPTURE, 0))
       || snd_pcm_hw_params_any(pcm, params)
       || snd_pcm_hw_params_set_access_mask(pcm, params, mask)
       || snd_pcm_hw_params_set_format(pcm, params, SND_PCM_FORMAT_S16_LE)
@@ -62,156 +55,64 @@ int AlsaMinder::open() {
   return 0;
 };
 
-void AlsaMinder::do_stop(double timeNow) {
-  Pollable::requestPollFDRegen();
+bool AlsaMinder::hw_is_open() {
+  return pcm != 0;
+};
+
+int AlsaMinder::hw_do_stop() {
   if (pcm) {
     snd_pcm_drop(pcm);
     snd_pcm_close(pcm);
     pcm = 0;
   }
-  stopTimestamp = timeNow;
-  stopped = true;
+  return 0;
 };
 
-void AlsaMinder::stop(double timeNow) {
-  shouldBeRunning = false;
-  do_stop(timeNow);
-};
-
-int AlsaMinder::do_start(double timeNow) {
+int AlsaMinder::hw_do_start() {
   if (!pcm && open())
     return 1;
-  Pollable::requestPollFDRegen();
   snd_pcm_prepare(pcm);
-  if (! (hasError = snd_pcm_start(pcm)) ) {
-    stopped = false;
-    // set timestamps to:
-    // - prevent warning about resuming after long pause
-    // - allow us to notice no data has been received for too long after startup
-    lastDataReceived = startTimestamp = timeNow;
-  }
+  hasError = snd_pcm_start(pcm);
   return 0;
 }
 
-int AlsaMinder::start(double timeNow) {
-  shouldBeRunning = true;
-  return do_start(timeNow);
+int AlsaMinder::hw_do_restart() {
+  snd_pcm_recover(pcm, hasError, 1);
+  snd_pcm_prepare(pcm);
+  snd_pcm_start(pcm);
+  return 0;
 };
 
-void AlsaMinder::addPluginRunner(std::string &label, shared_ptr < PluginRunner > pr) {
-  plugins[label] = pr;
-};
-
-void AlsaMinder::removePluginRunner(std::string &label) {
-  // remove plugin runner
-  plugins.erase(label);
-};
-
-void AlsaMinder::addRawListener(string &label, int downSampleFactor, bool writeWavHeader) {
-
-  shared_ptr < Pollable > sptr;
-  rawListeners[label] = sptr = Pollable::lookupByNameShared(label);
-  if (rawListeners.size() == 1) {
-    this->downSampleFactor = downSampleFactor;
-    for (int i=0; i < MAX_CHANNELS; ++i) {
-      downSampleAccum[i] = 0;
-      downSampleCount[i] = downSampleFactor;
-    }
-  }
-  if (writeWavHeader) {
-    Pollable *ptr = sptr.get();
-    if (ptr) {
-      // default max possible frames in .WAV header
-      // FIXME: hardcoded S16_LE format
-      WavFileHeader hdr(hwRate / downSampleFactor, numChan, 0x7ffffffe / 2);
-      ptr->queueOutput(hdr.address(), hdr.size());
-    }
-  }
-};
-
-void AlsaMinder::removeRawListener(string &label) {
-  rawListeners.erase(label);
-};
-
-void AlsaMinder::removeAllRawListeners() {
-  rawListeners.clear();
-};
-
-AlsaMinder::AlsaMinder(const string &alsaDev, int rate, unsigned int numChan, const string &label, double now):
-  Pollable(label),
-  alsaDev(alsaDev),
-  rate(rate),
-  numChan(numChan),
+AlsaMinder::AlsaMinder(const string &devName, int rate, unsigned int numChan, const string &label, double now):
+  DevMinder(devName, rate, numChan, label, now, BUFFER_FRAMES),
+  revents(0),
   pcm(0),
   buffer_frames(BUFFER_FRAMES),
-  period_frames(PERIOD_FRAMES),
-  revents(0),
-  totalFrames(0),
-  startTimestamp(-1.0),
-  stopTimestamp(now),
-  lastDataReceived(-1.0),
-  shouldBeRunning(false),
-  stopped(true),
-  hasError(0),
-  numFD(0),
-  demodFMForRaw(false),
-  demodFMLastTheta(0)
+  period_frames(PERIOD_FRAMES)
 {
-  if (open()) {
-    // there was an error, so throw an exception
-    delete_privates();
-    throw std::runtime_error("Could not open audio device or could not set required parameters");
-  }
-
 };
 
 AlsaMinder::~AlsaMinder() {
-  delete_privates();
 };
 
-string AlsaMinder::about() {
-  return "Device '" + label + "' = " + alsaDev;
-};
-
-string AlsaMinder::toJSON() {
-  ostringstream s;
-  s << "{"
-    << "\"type\":\"AlsaMinder\","
-    << "\"device\":\"" << alsaDev << "\","
-    << "\"rate\":" << rate << ","
-    << "\"hwRate\":" << hwRate << ","
-    << "\"numChan\":" << numChan << ","
-    << setprecision(14)
-    << "\"startTimestamp\":" << startTimestamp << ","
-    << "\"stopTimestamp\":" << stopTimestamp << ","
-    << "\"running\":" << (stopped ? "false" : "true") << ","
-    << "\"hasError\":" << hasError << ","
-    << "\"totalFrames\":" << totalFrames
-    << "}";
-  return s.str();
-}
-
-int AlsaMinder::getNumPollFDs () {
+int AlsaMinder::hw_getNumPollFDs () {
   return (pcm && shouldBeRunning) ? numFD : 0;
 };
 
-int AlsaMinder::getPollFDs (struct pollfd *pollfds) {
+int AlsaMinder::hw_getPollFDs (struct pollfd *pollfds) {
   // append pollfd(s) for this object to the specified vector
   // ALSA weirdness means there may be more than one fd per audio device
   if (pcm && shouldBeRunning) {
     if (numFD != snd_pcm_poll_descriptors(pcm, pollfds, numFD)) {
-      std::ostringstream msg;
-      msg << "\"event\":\"devProblem\",\"error\":\"snd_pcm_poll_descriptors returned error.\",\"devLabel\":\"" << label << "\"";
-      Pollable::asyncMsg(msg.str());
       return 1;
     }
   }
   return 0;
 }
 
-void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double timeNow) {
+int AlsaMinder::hw_handleEvents ( struct pollfd *pollfds, bool timedOut) {
   if (!pcm)
-    return;
+    return 0;
   short unsigned revents;
   if (!timedOut) {
     int rv = snd_pcm_poll_descriptors_revents( pcm, pollfds, numFD, & revents);
@@ -222,176 +123,61 @@ void AlsaMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double ti
     revents = 0;
   }
   if (revents & (POLLIN | POLLPRI)) {
-    // copy as much data as possible from mmap ring buffer
-    // and inform any pluginRunners that we have data
-
+    // return number of frames available
     snd_pcm_sframes_t avail = snd_pcm_avail_update (pcm);
-    if (avail < 0) {
-      snd_pcm_recover(pcm, avail, 1);
-      snd_pcm_prepare(pcm);
-      hasError = 0;
-      snd_pcm_start(pcm);
-      startTimestamp = timeNow;
-
-    } else if (avail > 0) {
-      lastDataReceived = timeNow;
-
-      double frameTimestamp;
-
-      // get most recent period timestamp from ALSA
-      snd_htimestamp_t ts;
-      snd_pcm_uframes_t av;
-      snd_pcm_htimestamp(pcm, &av, &ts);
-      frameTimestamp = ts.tv_sec + (double) ts.tv_nsec / 1.0e9 - (double) av / hwRate;
-
-      // begin direct access to ALSA mmap buffers for the device
-      const snd_pcm_channel_area_t *areas;
-      snd_pcm_uframes_t offset;
-      snd_pcm_uframes_t have = (snd_pcm_sframes_t) avail;
-
-      int errcode;
-      if ((errcode = snd_pcm_mmap_begin (pcm, & areas, & offset, & have))) {
-        std::ostringstream msg;
-        msg << "\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_begin returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"";
-        Pollable::asyncMsg(msg.str());
-        return;
-      }
-      avail = have;
-
-      totalFrames += avail;
-      int16_t *src0, *src1=0; // avoid compiler warning
-      int step;
-
-      /*
-        if a raw output listener exists, queue the new data onto it
-      */
-
-      if (rawListeners.size() > 0) {
-        // FIXME: assumes interleaved channels
-        src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
-        step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
-        src0 += step * offset;
-
-        int16_t rawSamples[numChan * avail];
-        if (numChan == 2 && demodFMForRaw) {
-          // do FM demodulation with simple but expensive arctan!
-          float dthetaScale = hwRate / (2 * M_PI) / 75000.0 * 32767.0;
-          int16_t * samps = (int16_t *) src0;
-          for (int i=0; i < avail; ++i) {
-            // get phase angle in -pi..pi
-            float theta = atan2f(samps[2*i], samps[2*i+1]);
-            float dtheta = theta - demodFMLastTheta;
-            demodFMLastTheta = theta;
-            if (dtheta > M_PI) {
-              dtheta -= 2 * M_PI;
-            } else if (dtheta < -M_PI) {
-              dtheta += 2 * M_PI;
-            }
-            rawSamples[i] = roundf(dthetaScale * dtheta);
-          }
-        } else {
-          for (unsigned i=0; i < avail * numChan; ++i) {
-            rawSamples[i] = *src0;
-            //            src0 += step;
-            ++src0;
-          }
-        }
-
-        // now downsample rawSamples, using the running accumulator
-        // we downsample in-place, keeping track of the destination
-        // index in downSampleAvail;
-
-        int downSampleAvail = avail;
-
-        if (downSampleFactor > 1) {
-          for (unsigned j = 0; j < numChan; ++j) {
-            int16_t * rs = & rawSamples[j];
-            int16_t * ds = rs;
-            downSampleAvail = 0; // works the same for all channels
-            for (int i=0; i < avail; ++i) {
-              downSampleAccum[j] += *rs;
-              rs += numChan;
-              if (! --downSampleCount[j]) {
-                downSampleCount[j] = downSampleFactor;
-                // simple dithering: round to nearest int, but retain remainder in downSampleAccum
-                int16_t downSample = (downSampleAccum[j] + downSampleFactor / 2) / downSampleFactor;
-                *ds = downSample;
-                downSampleAccum[j] -= downSample * downSampleFactor;
-                ds += numChan;
-                ++ downSampleAvail;
-              }
-            }
-          }
-        }
-
-        // there are now downSampleAvail samples, stored in rawSamples[0..downSampleAvail * numChan - 1]
-
-        for (RawListenerSet::iterator ir = rawListeners.begin(); ir != rawListeners.end(); /**/) {
-
-          if (Pollable * ptr = (ir->second).lock().get()) {
-            ptr->queueOutput((char *) rawSamples, downSampleAvail * 2 * numChan, frameTimestamp ); // NB: hardcoded S16_LE sample size
-            ++ir;
-          } else {
-            RawListenerSet::iterator to_delete = ir++;
-            rawListeners.erase(to_delete);
-          }
-        }
-      }
-      /*
-      copy from ALSA mmap buffers to each attached plugin's buffer,
-      converting from S16_LE to float, and calling the plugin if its
-      buffer has reached blocksize
-      */
-
-      for (PluginRunnerSet::iterator ip = plugins.begin(); ip != plugins.end(); /**/) {
-        // we are going out on a limb and assuming the step is the same for both channels
-
-        src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
-        step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
-        src0 += step * offset;
-
-        if (numChan == 2) {
-          src1 = (int16_t *) (((unsigned char *) areas[1].addr) + areas[1].first / 8);
-          src1 += step * offset;
-        }
-
-        if (boost::shared_ptr < PluginRunner > ptr = (ip->second).lock()) {
-          ptr->handleData(avail, src0, src1, step, frameTimestamp);
-          ++ip;
-        } else {
-          PluginRunnerSet::iterator to_delete = ip++;
-          plugins.erase(to_delete);
-        }
-      }
-      /*
-      Tell ALSA we're finished using its internal mmap buffer.  We do
-      this after calling the plugin, which means we may be hanging on
-      to it for a long time, but this way we can process all available
-      data with a single pair of calls to snd_pcm_mmap_begin and
-      snd_pcm_mmap_commit. We've tried to make the buffer for each
-      device much larger than a single period, so that ALSA has plenty
-      of room to store new data even while we have this chunk of its
-      ring buffer locked up.
-      */
-
-      if (0 > snd_pcm_mmap_commit (pcm, offset, avail)) {
-        std::ostringstream msg;
-        msg << "\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_commit returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"";
-        Pollable::asyncMsg(msg.str());
-      }
-    }
-  } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_AUDIO_QUIET_TIME) {
-    // this device appears to have stopped delivering audio; try restart it
-    std::ostringstream msg;
-    msg << "\"event\":\"devStalled\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs;\",\"devLabel\":\"" << label << "\"";
-    Pollable::asyncMsg(msg.str());
-    lastDataReceived = timeNow; // wait before next restart
-    stop(timeNow);
-    Pollable::requestPollFDRegen();
+    return avail;
   }
+  return 0;
 };
 
-void
-AlsaMinder::setDemodFMForRaw(bool demod) {
-  demodFMForRaw = demod;
+int AlsaMinder::hw_getFrames (int16_t *buf, int numFrames, double & frameTimestamp) {
+  // get most recent period timestamp from ALSA
+  snd_htimestamp_t ts;
+  snd_pcm_uframes_t av;
+  snd_pcm_htimestamp(pcm, &av, &ts);
+  frameTimestamp = ts.tv_sec + (double) ts.tv_nsec / 1.0e9 - (double) av / hwRate;
+
+  // begin direct access to ALSA mmap buffers for the device
+  const snd_pcm_channel_area_t *areas;
+  snd_pcm_uframes_t offset;
+  snd_pcm_uframes_t have = (snd_pcm_sframes_t) numFrames;
+
+  int errcode = snd_pcm_mmap_begin (pcm, & areas, & offset, & have);
+  if (errcode)
+    return errcode > 0 ? -errcode : errcode;
+
+  int16_t *src0, *src1=0; // avoid compiler warning
+  int step;
+
+  /*
+    copy available samples to buf
+  */
+
+  // FIXME: assumes interleaved channels
+  src0 = (int16_t *) (((unsigned char *) areas[0].addr) + areas[0].first / 8);
+  step = areas[0].step / 16; // FIXME:  hardcoding S16_LE assumption
+  src0 += step * offset;
+
+  if (numChan == 2) {
+    src1 = (int16_t *) (((unsigned char *) areas[1].addr) + areas[1].first / 8);
+    src1 += step * offset;
+    for (unsigned i=0; i < have * numChan; ++i) {
+      *buf++ = *src0;
+      *buf++ = *src1;
+      src0 += step;
+      src1 += step;
+    }
+  } else {
+    for (unsigned i=0; i < have * numChan; ++i) {
+      *buf++ = *src0;
+      src0 += step;
+    }
+  }
+  errcode = snd_pcm_mmap_commit (pcm, offset, have);
+  if (errcode < 0) {
+    std::ostringstream msg;
+    msg << "\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_commit returned with error " << (-errcode) << "\",\"devLabel\":\"" << label << "\"";
+    Pollable::asyncMsg(msg.str());
+  }
+  return (have);
 };

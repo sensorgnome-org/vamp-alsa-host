@@ -131,7 +131,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     int rate, numChan;
     cmd >> label >> alsaDev >> rate >> numChan;
     try {
-      DevMinder * ptr = new DevMinder(alsaDev, rate, numChan, label, realTimeNow);
+      DevMinder * ptr = DevMinder::getDevMinder(alsaDev, rate, numChan, label, realTimeNow);
       reply << ptr->toJSON() << '\n';
     } catch (std::runtime_error e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
