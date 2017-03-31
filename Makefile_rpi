@@ -1,4 +1,4 @@
-CCOPTS_PRODUCTION := -DRPI -I. -O3 -Wall -fPIC -ftree-vectorize -ffast-math -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=hard
+CCOPTS_PRODUCTION := -DRPI -I. -g -O2 -Wall -fPIC -ftree-vectorize -ffast-math -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
 CCOPTS_DEBUG      := -DRPI -I. -g3 -Wall -fPIC -ftree-vectorize -ffast-math -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
@@ -41,7 +41,7 @@ WavFileWriter.o: WavFileWriter.cpp
 vamp-alsa-host.o: vamp-alsa-host.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
-vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o PluginRunner.o VampAlsaHost.o AlsaMinder.o WavFileWriter.o DevMinder.o
+vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o PluginRunner.o VampAlsaHost.o AlsaMinder.o WavFileWriter.o DevMinder.o RTLSDRMinder.o
 	g++ $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk -lboost_filesystem -lboost_system -lboost_thread -lfftw3f
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.

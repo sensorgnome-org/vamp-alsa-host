@@ -11,23 +11,13 @@
 using namespace std;
 
 #include <alsa/asoundlib.h>
-
-#include "Pollable.hpp"
-#include "PluginRunner.hpp"
-#include "WavFileHeader.hpp"
 #include "DevMinder.hpp"
-
-typedef std::map < string, weak_ptr < Pollable > > RawListenerSet;
-typedef std::map < string, weak_ptr < PluginRunner > > PluginRunnerSet;
-
-class DevMinder;
 
 class AlsaMinder : public DevMinder {
 public:
 
   static const int  PERIOD_FRAMES         = 4800;   // 40 periods per second for FCD Pro +; 20 periods per second for FCD Pro
   static const int  BUFFER_FRAMES         = 131072; // 128K appears to be max buffer size in frames; this is 0.683 s for FCD Pro+, 1.365 s for FCD Pro
-  static const int  MAX_CHANNELS          = 2;      // maximum of two channels per device
 
 protected:
 

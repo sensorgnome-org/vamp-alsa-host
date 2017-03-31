@@ -3,7 +3,7 @@
 // declarations of subclasses for factory method
 
 #include "AlsaMinder.hpp"
-//#include "RTLSDRMinder.hpp"
+#include "RTLSDRMinder.hpp"
 
 void DevMinder::delete_privates() {
   hw_delete_privates();
@@ -121,8 +121,8 @@ DevMinder::DevMinder(const string &devName, int rate, unsigned int numChan, cons
 DevMinder * DevMinder::getDevMinder(const string &devName, int rate, unsigned int numChan, const string &label, double now) {
 
   DevMinder * dev;
-  if (devName.substr( 0, 7 ) == "rtlsdr-") {
-    //    dev = new RTLSDRMinder(devName, rate, numChan, label, now);
+  if (devName.substr( 0, 7 ) == "rtlsdr:") {
+    dev = new RTLSDRMinder(devName, rate, numChan, label, now);
     dev = 0;
   } else {
     dev = new AlsaMinder(devName, rate, numChan, label, now);
