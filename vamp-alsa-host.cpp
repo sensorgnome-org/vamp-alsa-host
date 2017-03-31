@@ -68,7 +68,7 @@
    vamp-alsa-host was originally intended to read from one or more
    funcubedongle radio receivers, process the signal through a VAMP
    plugin, and write the features found by the plugin to one or more
-   socket 
+   socket
 
    The funcubedongle streams baseband I/Q output as stereo USB audio
    at 96ksps in S16_LE format.  Due to apparent quirks in the
@@ -85,7 +85,7 @@
    try to provide real timestamps.  On the bonedongle (i.e. beaglebone
    + funcubedongle), timestamp precision appears to be around 1ms or
    less.
-   
+
    FIXME:
    Sample format is hard-coded as S16_LE to match the funcubedongle.
 
@@ -124,7 +124,7 @@
 #include <signal.h>
 #include <inttypes.h>
 
-using namespace std;
+//using namespace std;
 
 using Vamp::Plugin;
 using Vamp::PluginHostAdapter;
@@ -133,23 +133,13 @@ using Vamp::HostExt::PluginLoader;
 using Vamp::HostExt::PluginWrapper;
 using Vamp::HostExt::PluginInputDomainAdapter;
 
-
-#include "ParamSet.hpp"
-
 #include "Pollable.hpp"
 #include "VampAlsaHost.hpp"
 #include "TCPListener.hpp"
-#include "TCPConnection.hpp"
-
-class PluginRunner;
-class AlsaMinder;
-
-#include "PluginRunner.hpp"
-#include "AlsaMinder.hpp"
 
 static VampAlsaHost *host;
-  
-#define HOST_VERSION "1.4"
+
+#define HOST_VERSION "1.5"
 
 static string serverSocketName = "/tmp/VAH.sock";            // port on which we listen for connections
 
@@ -158,9 +148,9 @@ static const string appname="vamp-alsa-host";
 void
 getFeaturesToBuffer(int, Plugin::FeatureSet, string, long long * totalFeatures);
 
-void 
+void
 usage(string name) {
-    cerr << endl << name << ": A command-line host for running Vamp audio analysis plugins\n"
+   std::cerr << std::endl << name << ": A command-line host for running Vamp audio analysis plugins\n"
         "on data from one or more USB audio devices.\n\n"
 
         "Copyright 2012 John Brzustowski.\n\n"
@@ -175,7 +165,7 @@ usage(string name) {
         "Usage:\n" << name << " [-q] [-s SOCKNAME] &\n"
         "    -- Runs a server which listens and replies to commands via\n"
         "       unix domain socket SOCKNAME, which is created in /tmp\n"
-        "       SOCKNAME defaults to " << serverSocketName << endl << 
+        "       SOCKNAME defaults to " << serverSocketName << std::endl <<
         "       Reply text is terminated by an empty line.\n\n"
 
         "    Specifying '-q' tells the server not to print the welcome message to clients.\n\n"
@@ -184,9 +174,9 @@ usage(string name) {
          << VampAlsaHost::commandHelp;
 }
 
-void terminate (int p) 
+void terminate (int p)
 {
-    
+
     if (Pollable::terminating)
         return;
     Pollable::terminating = true;
@@ -196,7 +186,7 @@ void terminate (int p)
     exit(p);
 }
 
-int 
+int
 main(int argc, char **argv)
 {
     enum {
@@ -269,7 +259,7 @@ main(int argc, char **argv)
     signal(SIGFPE, terminate);
     signal(SIGABRT, terminate);
 
-    ostringstream label("Socket:", ios_base::app);
+    ostringstream label("Socket:", std::ios_base::app);
     label << serverSocketName;
     host = new VampAlsaHost();
     new TCPListener(serverSocketName, label.str(), quiet);
@@ -277,8 +267,7 @@ main(int argc, char **argv)
     try {
         rv = host->run();
     } catch (std::runtime_error e) {
-        cerr << "vamp-alsa-host terminated\nWhy: " << e.what();
+        std::cerr << "vamp-alsa-host terminated\nWhy: " << e.what();
     };
     exit(rv);
 }
-
