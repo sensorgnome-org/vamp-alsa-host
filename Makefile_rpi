@@ -17,6 +17,9 @@ install: vamp-alsa-host
 AlsaMinder.o: AlsaMinder.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
+RTLSDRMinder.o: RTLSDRMinder.cpp
+	g++ $(CCOPTS) -c -o $@ $<
+
 DevMinder.o: DevMinder.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
@@ -46,7 +49,7 @@ vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o Plugi
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
-AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
+AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp DevMinder.hpp
 AlsaMinder.o: ParamSet.hpp
 DevMinder.o: DevMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
 DevMinder.o: ParamSet.hpp

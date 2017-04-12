@@ -84,7 +84,7 @@ int AlsaMinder::hw_do_restart() {
 };
 
 AlsaMinder::AlsaMinder(const string &devName, int rate, unsigned int numChan, const string &label, double now):
-  DevMinder(devName, rate, numChan, label, now, BUFFER_FRAMES),
+  DevMinder(devName, rate, numChan, 32768, label, now, BUFFER_FRAMES),
   revents(0),
   pcm(0),
   buffer_frames(BUFFER_FRAMES),

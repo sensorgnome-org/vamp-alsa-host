@@ -1,8 +1,8 @@
 #include "Pollable.hpp"
 #include <stdint.h>
 
-Pollable::Pollable(const std::string label) : 
-  label(label), 
+Pollable::Pollable(const std::string label) :
+  label(label),
   indexInPollFD(-1),
   outputBuffer(DEFAULT_OUTPUT_BUFFER_SIZE)
 {
@@ -10,12 +10,12 @@ Pollable::Pollable(const std::string label) :
   pollables[label] = shared_ptr < Pollable > (this);
   regen_pollfds = true;
 };
-  
+
 Pollable::~Pollable() {
   //  std::cout << "About to destroy Pollable with label " << label << std::endl;
 };
 
-void 
+void
 Pollable::remove(const std::string label) {
   if (Pollable::terminating)
     return;
@@ -38,21 +38,21 @@ Pollable::remove(const std::string label) {
     controlSocketClosed();
 };
 
-Pollable * 
+Pollable *
 Pollable::lookupByName (const std::string& label) {
   if (pollables.count(label) == 0)
     return 0;
   return pollables[label].get();
 };
 
-shared_ptr < Pollable > 
+shared_ptr < Pollable >
 Pollable::lookupByNameShared (const std::string& label) {
   if (pollables.count(label) == 0)
     return shared_ptr < Pollable > ((Pollable *) 0);
   return pollables[label];
 };
 
-short& 
+short&
 Pollable::eventsOf(int offset) {
 
   // return a reference to the events field for a Pollable.
@@ -61,12 +61,12 @@ Pollable::eventsOf(int offset) {
   return allpollfds[indexInPollFD + offset].events;
 };
 
-void 
+void
 Pollable::requestPollFDRegen() {
   regen_pollfds = true;
 };
 
-int 
+int
 Pollable::poll(int timeout) {
   doing_poll = true;
 
@@ -79,7 +79,7 @@ Pollable::poll(int timeout) {
   }
 
   bool timedOut = rv == 0;
-  // handle events for each pollable.  We give each pollable the chance 
+  // handle events for each pollable.  We give each pollable the chance
   // to deal with timeouts, by passing that along.
 
   for (PollableSet::iterator is = pollables.begin(); is != pollables.end(); ++is) {
@@ -89,7 +89,8 @@ Pollable::poll(int timeout) {
     int i = ptr->indexInPollFD;
     if (i < 0)
       continue;
-    ptr->handleEvents(&allpollfds[i], timedOut, VampAlsaHost::now());
+    if (timedOut || allpollfds[i].revents)
+      ptr->handleEvents(&allpollfds[i], timedOut, VampAlsaHost::now());
     if (regen_pollfds)
       break;
   }
@@ -98,18 +99,18 @@ Pollable::poll(int timeout) {
   return 0;
 };
 
-void 
+void
 Pollable::doDeferrals() {
   if (! have_deferrals)
     return;
   have_deferrals = false;
   regen_pollfds = true;
-  for (std::vector < std::string> ::iterator is = deferred_removes.begin(); is != deferred_removes.end(); ++is) 
+  for (std::vector < std::string> ::iterator is = deferred_removes.begin(); is != deferred_removes.end(); ++is)
     pollables.erase(*is);
   deferred_removes.clear();
 };
-    
-void 
+
+void
 Pollable::regenFDs() {
   if (regen_pollfds) {
     regen_pollfds = false;
@@ -176,7 +177,7 @@ Pollable::writeSomeOutput (int maxBytes) {
     }
     return num_bytes;
   } else {
-    // output buffer is empty; stop writing 
+    // output buffer is empty; stop writing
     pollfd.events &= ~POLLOUT;
     if (indexInPollFD >= 0)
       eventsOf(0) = pollfd.events;
@@ -184,7 +185,7 @@ Pollable::writeSomeOutput (int maxBytes) {
   }
 };
 
-void 
+void
 Pollable::asyncMsg(std::string msg) {
   // send an asynchronous message to the control TCP connection (the first tcp connection)
   Pollable *con = lookupByName(controlSocketLabel);
@@ -204,7 +205,7 @@ Pollable::controlSocketClosed() {
   controlSocketLabel = "";
 };
 
-bool 
+bool
 Pollable::haveControlSocket() {
   return controlSocketLabel.length() > 0;
 }
@@ -219,4 +220,3 @@ bool Pollable::have_deferrals = false;
 bool Pollable::doing_poll = false;
 bool Pollable::terminating = false;
 string Pollable::controlSocketLabel = "";
-

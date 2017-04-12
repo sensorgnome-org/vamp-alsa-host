@@ -1,4 +1,4 @@
-CCOPTS_PRODUCTION := -I. -O3 -Wall -fPIC -ftree-vectorize -ffast-math  
+CCOPTS_PRODUCTION := -I. -O3 -Wall -fPIC -ftree-vectorize -ffast-math
 CCOPTS_DEBUG      := -I. -g3 -Wall -fPIC -ftree-vectorize -ffast-math
 
 CCOPTS := $(CCOPTS_PRODUCTION)
@@ -15,6 +15,9 @@ install: vamp-alsa-host
 	cp vamp-host /usr/bin
 
 AlsaMinder.o: AlsaMinder.cpp
+	g++ $(CCOPTS) -c -o $@ $<
+
+RTLSDRMinder.o: RTLSDRMinder.cpp
 	g++ $(CCOPTS) -c -o $@ $<
 
 PluginRunner.o: PluginRunner.cpp
@@ -41,7 +44,7 @@ vamp-alsa-host.o: vamp-alsa-host.cpp
 vamp-host.o: vamp-host.cpp
 	g++  $(CCOPTS) -c -o $@ $<
 
-vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o PluginRunner.o VampAlsaHost.o AlsaMinder.o WavFileWriter.o
+vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o PluginRunner.o VampAlsaHost.o AlsaMinder.o RTLSDRMinder.o WavFileWriter.o
 	g++ $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk -lboost_filesystem -lboost_system -lboost_thread
 
 vamp-host: vamp-host.o
@@ -52,8 +55,10 @@ vamp-host: vamp-host.o
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
-AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
+AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp DevMinder.hpp
 AlsaMinder.o: ParamSet.hpp
+RTLSDRMinder.o: RTLSDRMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp DevMinder.hpp
+RTLSDRMinder.o: ParamSet.hpp
 PluginRunner.o: PluginRunner.hpp ParamSet.hpp Pollable.hpp VampAlsaHost.hpp
 PluginRunner.o: AlsaMinder.hpp
 TCPConnection.o: TCPConnection.hpp Pollable.hpp VampAlsaHost.hpp
@@ -65,8 +70,6 @@ vamp-alsa-host.o: ParamSet.hpp Pollable.hpp VampAlsaHost.hpp TCPListener.hpp
 vamp-alsa-host.o: TCPConnection.hpp PluginRunner.hpp AlsaMinder.hpp
 vamp-host.o: system.h
 WavFileWriter.o: WavFileWriter.hpp Pollable.hpp VampAlsaHost.hpp
-AlsaMinder.o: Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp ParamSet.hpp
-AlsaMinder.o: AlsaMinder.hpp
 PluginRunner.o: ParamSet.hpp Pollable.hpp VampAlsaHost.hpp AlsaMinder.hpp
 PluginRunner.o: PluginRunner.hpp
 Pollable.o: VampAlsaHost.hpp

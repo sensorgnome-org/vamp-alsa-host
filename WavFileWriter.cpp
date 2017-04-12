@@ -40,7 +40,7 @@ WavFileWriter::WavFileWriter (string &portLabel, string &label, char *pathTempla
 int WavFileWriter::getNumPollFDs() {
   return (pollfd.fd >= 0) ? 1 : 0;
 };
-  
+
 int WavFileWriter::getPollFDs (struct pollfd * pollfds) {
   * pollfds = pollfd;
   return 0;
@@ -64,7 +64,7 @@ bool WavFileWriter::queueOutput(const char *p, uint32_t len, double timestamp) {
   bool rv = Pollable::queueOutput(p, len);
 
   if (pollfd.fd < 0)
-    openOutputFile(lastFrameTimestamp - outputBuffer.size() / (2.0 * channels * rate));    
+    openOutputFile(lastFrameTimestamp - outputBuffer.size() / (2.0 * channels * rate));
 
   // only set this fd up for output polling if there's MIN_WRITE_SIZE data
   // otherwise, we're calling write() much too often
@@ -78,7 +78,7 @@ bool WavFileWriter::queueOutput(const char *p, uint32_t len, double timestamp) {
 };
 
 void WavFileWriter::openOutputFile(double first_timestamp) {
-  if (pathTemplate == "") 
+  if (pathTemplate == "")
     return;
 
   switch (ensureDirsState) {
@@ -127,7 +127,7 @@ void WavFileWriter::openOutputFile(double first_timestamp) {
     break;
   }
 }
-  
+
 void WavFileWriter::ensureDirs(WavFileWriter *wav) {
   // yield immediately upon creation so we hopefully don't run until main thread is polling
   boost::this_thread::yield();
@@ -140,18 +140,17 @@ void WavFileWriter::doneOutputFile(int err) {
     close(pollfd.fd);
     pollfd.fd = -1;
     ++totalFilesWritten;
-    prevSecondsWritten = (bytesToWrite - byteCountdown) / (2.0 * channels * rate); // FIXME: hardwired S16_LE format 
+    prevSecondsWritten = (bytesToWrite - byteCountdown) / (2.0 * channels * rate); // FIXME: hardwired S16_LE format
     totalSecondsWritten += prevSecondsWritten;
   }
   requestPollFDRegen();
 
   std::ostringstream msg;
-  msg << "{\"async\":true,\"event\":\"" << (err ? "rawFileError" : "rawFileDone") << "\",\"devLabel\":\"" << portLabel << "\"";
+  msg << "\"async\":true,\"event\":\"" << (err ? "rawFileError" : "rawFileDone") << "\",\"devLabel\":\"" << portLabel << "\"";
   if (err)
     msg << ",\"errno\":" << err;
-  msg << "}\n";        
   Pollable::asyncMsg(msg.str());
-  if (err) 
+  if (err)
     Pollable::remove(label);
   else
     pathTemplate = "";
@@ -207,14 +206,14 @@ WavFileWriter::resumeWithNewFile(string path) {
 
 string WavFileWriter::toJSON() {
   ostringstream s;
-  s << "{" 
+  s << "{"
     << "\"type\":\"WavFileWriter\""
     << ",\"port\":\"" << portLabel
     << "\",\"fileDescriptor\":" << pollfd.fd
     << ",\"fileName\":\"" << (char *) filename
     << "\",\"framesWritten\":" << (uint32_t) ((bytesToWrite - byteCountdown) / (2 * channels))
     << ",\"framesToWrite\":" << framesToWrite
-    << ",\"secondsWritten\":"  << std::setprecision(16) << ((bytesToWrite - byteCountdown) / (2.0 * rate * channels))   
+    << ",\"secondsWritten\":"  << std::setprecision(16) << ((bytesToWrite - byteCountdown) / (2.0 * rate * channels))
     << ",\"secondsToWrite\":" << framesToWrite / (double) rate
     << ",\"totalFilesWritten\":" << totalFilesWritten
     << ",\"totalSecondsWritten\":" << totalSecondsWritten

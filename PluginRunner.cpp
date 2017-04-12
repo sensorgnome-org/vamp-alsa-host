@@ -13,8 +13,6 @@ void PluginRunner::delete_privates() {
     }
     delete [] plugbuf;
   }
-  if (partialFrameSum)
-    delete [] partialFrameSum;
 };
 
 int PluginRunner::loadPlugin() {
@@ -117,7 +115,7 @@ int PluginRunner::loadPlugin() {
   return 0;
 };
 
-PluginRunner::PluginRunner(const string &label, const string &devLabel, int rate, int hwRate, int numChan, const string &pluginSOName, const string &pluginID, const string &pluginOutput, const ParamSet &ps):
+PluginRunner::PluginRunner(const string &label, const string &devLabel, int rate, int numChan, unsigned int maxSampleAbs, const string &pluginSOName, const string &pluginID, const string &pluginOutput, const ParamSet &ps):
   Pollable (label),
   label(label),
   devLabel(devLabel),
@@ -126,8 +124,8 @@ PluginRunner::PluginRunner(const string &label, const string &devLabel, int rate
   pluginOutput(pluginOutput),
   pluginParams(ps),
   rate(rate),
-  hwRate(hwRate),
   numChan(numChan),
+  maxSampleAbs(maxSampleAbs),
   totalFrames(0),
   totalFeatures(0),
   plugin(0),
@@ -137,10 +135,7 @@ PluginRunner::PluginRunner(const string &label, const string &devLabel, int rate
   stepSize(0),
   framesInPlugBuf(0),
   isOutputBinary(false),
-  resampleDecim(hwRate / rate),
-  resampleScale(1.0 / (32768.0 * resampleDecim)),
-  resampleCountdown(resampleDecim),
-  partialFrameSum(new int[numChan]),
+  resampleScale(1.0 / maxSampleAbs),
   lastFrametimestamp(0)
 {
 
@@ -150,8 +145,6 @@ PluginRunner::PluginRunner(const string &label, const string &devLabel, int rate
     delete_privates();
     throw std::runtime_error("Could not load plugin or plugin is not compatible");
   }
-  for (int i=0; i < numChan; ++i)
-    partialFrameSum[i] = 0;
 };
 
 PluginRunner::~PluginRunner() {
@@ -180,54 +173,27 @@ void PluginRunner::removeAllOutputListeners() {
 void PluginRunner::handleData(long avail, int16_t *src0, int16_t *src1, int step, double frameTimestamp) {
   // alsaHandler has some data for us.  If src1 is NULL, it's only one channel; otherwise it's two channels
 
-  int pfs0 = partialFrameSum[0];
-  int pfs1 = partialFrameSum[1];
-  int rc = resampleCountdown;
-
   // get timestamp of first (hardware) frame in plugin's buffer
-  frameTimestamp -= (double) framesInPlugBuf / rate + (double) (resampleDecim - rc) / hwRate;
+  frameTimestamp -= (double) framesInPlugBuf / rate;
 
   while (avail > 0) {
-    int hw_frames_to_copy = std::min((int) avail, (blockSize - framesInPlugBuf - 1) * resampleDecim + rc);
-    avail -= hw_frames_to_copy;
-    int decimated_frame_count = (hw_frames_to_copy + (resampleDecim - rc)) / resampleDecim;
-    float *pb0, *pb1;
-    pb0 = plugbuf[0] + framesInPlugBuf;
+    int hw_frames_to_copy = std::min((int) avail, blockSize - framesInPlugBuf);
+    float *pb0 = plugbuf[0] + framesInPlugBuf;
+    float *pb1 = plugbuf[1] + framesInPlugBuf;
 
-    // choose an inner loop, depending on number of channels
+    for (int i = 0; i < hw_frames_to_copy; ++i, ++pb0, src0 += step) {
+      *pb0 = *src0 * resampleScale;
+    }
     if (src1) {
-      // two channels
-      pb1 = plugbuf[1] + framesInPlugBuf;
-      while (hw_frames_to_copy) {
-        pfs0 += *src0;
-        pfs1 += *src1;
-        src0 += step;
-        src1 += step;
-        --hw_frames_to_copy;
-        --rc;
-        if (rc == 0) {
-          *pb0++ = pfs0 * resampleScale;
-          *pb1++ = pfs1 * resampleScale;
-          pfs0 = pfs1 = 0;
-          rc = resampleDecim;
-        }
-      }
-    } else {
-      // one channel
-      while (hw_frames_to_copy) {
-        pfs0 += *src0;
-        src0 += step;
-        --hw_frames_to_copy;
-        --rc;
-        if (rc == 0) {
-          *pb0++ = pfs0 * resampleScale;
-          pfs0 = 0;
-          rc = resampleDecim;
-        }
+      for (int i = 0; i < hw_frames_to_copy; ++i, ++pb1, src1 += step) {
+        *pb1 = *src1 * resampleScale;
       }
     }
-    framesInPlugBuf += decimated_frame_count;
-    totalFrames += decimated_frame_count;
+
+    avail -= hw_frames_to_copy;
+    totalFrames += hw_frames_to_copy;
+    framesInPlugBuf += hw_frames_to_copy;
+
     if (framesInPlugBuf == blockSize) {
       // time to call the plugin
 
@@ -260,9 +226,6 @@ void PluginRunner::handleData(long avail, int16_t *src0, int16_t *src1, int step
       }
     }
   }
-  partialFrameSum[0] = pfs0;
-  partialFrameSum[1] = pfs1;
-  resampleCountdown = rc;
 };
 
 void

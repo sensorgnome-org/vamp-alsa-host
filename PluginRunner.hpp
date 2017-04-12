@@ -8,6 +8,7 @@
 #include <vamp-sdk/Plugin.h>
 #include <vamp-sdk/PluginBase.h>
 #include <stdint.h>
+#include <iomanip>
 #include <set>
 #include <memory>
 #include <fftw3.h>
@@ -33,8 +34,8 @@ protected:
   static PluginLoader *pluginLoader;   // plugin loader (singleton)
   VampAlsaHost *     host;             // host
   int                rate;             // sampling rate for plugin; frames per second
-  int                hwRate;           // sampling rate of hardware to which we're attached
   unsigned int       numChan;          // number of channels plugin uses
+  unsigned int       maxSampleAbs;     // maximum absolute value of sample
   long long          totalFrames;      // total number of (decimated) frames this plugin instance has processed
   long long          totalFeatures;    // total number of "features" (e.g. lotek pulses) seen on this FCD
   Plugin *           plugin;           // VAMP plugin we'll be running on this fcd
@@ -44,10 +45,7 @@ protected:
   int                stepSize;         // amount (in frames) by which consecutive blocks differ
   int                framesInPlugBuf;  // number of frames in plugin buffers since last call to plugin->process()
   bool               isOutputBinary;   // if true, output from plugin is not text.  For text outputs, if
-  int                resampleDecim;    // the number of incoming hardware frames to combine into a frame for the plugin
   float              resampleScale;    // scale factor for a sum of hardware samples
-  int                resampleCountdown; // number of hardware frames left to get before we have a resampled frame
-  int *              partialFrameSum;  // partial frame sums from previous call to handleData
   double             lastFrametimestamp; // frame timestamp from prvious call to handleData
 
   // the output buffer gets filled before it can be written to a socket,
@@ -58,7 +56,7 @@ protected:
   OutputListenerSet     outputListeners;     // connections receiving output from this plugin, if any.
 
 public:
-  PluginRunner(const string &label, const string &devLabel, int rate, int hwRate, int numChan, const string &pluginSOName, const string &pluginID, const string &pluginOutput, const ParamSet &ps);
+  PluginRunner(const string &label, const string &devLabel, int rate, int numChan, unsigned int maxSampleAbs, const string &pluginSOName, const string &pluginID, const string &pluginOutput, const ParamSet &ps);
   ~PluginRunner();
 
   bool addOutputListener(string connLabel);

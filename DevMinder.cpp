@@ -99,11 +99,12 @@ void DevMinder::removeAllRawListeners() {
   rawListeners.clear();
 };
 
-DevMinder::DevMinder(const string &devName, int rate, unsigned int numChan, const string &label, double now, int buffSize):
+DevMinder::DevMinder(const string &devName, int rate, unsigned int numChan, unsigned int maxSampleAbs, const string &label, double now, int buffSize):
   Pollable(label),
   devName(devName),
   rate(rate),
   numChan(numChan),
+  maxSampleAbs(maxSampleAbs),
   totalFrames(0),
   startTimestamp(-1.0),
   stopTimestamp(now),
@@ -180,7 +181,7 @@ void DevMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double tim
   int avail = hw_handleEvents(pollfds, timedOut);
   if (avail < 0) {
     std::ostringstream msg;
-    msg << "\"event\":\"devProblem\",\"error\":\" snd_pcm_mmap_begin returned with error " << (- avail) << "\",\"devLabel\":\"" << label << "\"";
+    msg << "\"event\":\"devProblem\",\"error\":\" device returned with error " << (- avail) << "\",\"devLabel\":\"" << label << "\"";
     Pollable::asyncMsg(msg.str());
     hw_do_restart();
     return;
@@ -282,7 +283,7 @@ void DevMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double tim
 
     for (PluginRunnerSet::iterator ip = plugins.begin(); ip != plugins.end(); /**/) {
       if (boost::shared_ptr < PluginRunner > ptr = (ip->second).lock()) {
-        ptr->handleData(downSampleAvail, & sampleBuf[0], & sampleBuf[1], numChan, frameTimestamp);
+        ptr->handleData(downSampleAvail, & sampleBuf[0], & sampleBuf[1], 2, frameTimestamp);
         ++ip;
       } else {
         PluginRunnerSet::iterator to_delete = ip++;

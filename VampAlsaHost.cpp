@@ -165,7 +165,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         throw std::runtime_error(string("There is no device with label '") + devLabel + "'");
       if (Pollable::lookupByName(pluginLabel))
         throw std::runtime_error(string("There is already a device or plugin with label '") + pluginLabel + "'");
-      new PluginRunner(pluginLabel, devLabel, dev->rate, dev->hwRate, dev->numChan, pluginLib, pluginName, outputName, ps);
+      new PluginRunner(pluginLabel, devLabel, dev->rate, dev->numChan, dev->maxSampleAbs, pluginLib, pluginName, outputName, ps);
       shared_ptr < PluginRunner > plugin = static_pointer_cast < PluginRunner > (Pollable::lookupByNameShared(pluginLabel));
       dev->addPluginRunner(pluginLabel, plugin);
       if (! plugin->addOutputListener(defaultOutputListener))

@@ -29,6 +29,7 @@ public:
   int                rate;             // sampling rate to supply plugins with
   unsigned int       hwRate;           // sampling rate of hardware device
   unsigned int       numChan;          // number of channels to read from device
+  unsigned int       maxSampleAbs;     // maximum absolute value of sample
 
 protected:
 
@@ -72,7 +73,7 @@ public:
 
   void addPluginRunner(std::string &label, shared_ptr < PluginRunner > pr);
   void removePluginRunner(std::string &label);
-  void addRawListener(string &label, int downSampleFactor, bool writeWavHeader = false, bool downSampleUseAvg = true);
+  void addRawListener(string &label, int downSampleFactor, bool writeWavHeader = false, bool downSampleUseAvg = false);
   void removeRawListener(string &label);
   void removeAllRawListeners();
 
@@ -101,7 +102,7 @@ public:
 
 protected:
 
-  DevMinder(const string &devName, int rate, unsigned int numChan, const string &label, double now, int buffSize); // buffSize is in frames.
+  DevMinder(const string &devName, int rate, unsigned int numChan, unsigned int maxSampleAbs, const string &label, double now, int buffSize); // buffSize is in frames.
 
   void delete_privates();
   virtual void hw_delete_privates() = 0;
