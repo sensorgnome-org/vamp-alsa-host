@@ -6,7 +6,6 @@
 #include "RTLSDRMinder.hpp"
 
 void DevMinder::delete_privates() {
-  hw_delete_privates();
   if (Pollable::terminating)
     return;
   for (PluginRunnerSet::iterator ip = plugins.begin(); ip != plugins.end(); /**/) {

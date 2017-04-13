@@ -6,7 +6,7 @@
 
 #define UNIX_PATH_MAX 108
 
-void RTLSDRMinder::hw_delete_privates() {
+void RTLSDRMinder::delete_privates() {
   if (rtltcp >= 0) {
     close(rtltcp);
     rtltcp = -1;
@@ -63,6 +63,7 @@ RTLSDRMinder::RTLSDRMinder(const string &devName, int rate, unsigned int numChan
 };
 
 RTLSDRMinder::~RTLSDRMinder() {
+  delete_privates();
 };
 
 int RTLSDRMinder::hw_getNumPollFDs () {

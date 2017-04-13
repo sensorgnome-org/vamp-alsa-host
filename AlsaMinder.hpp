@@ -49,7 +49,7 @@ public:
 
 protected:
 
-  virtual void hw_delete_privates();
+  virtual void delete_privates();
   virtual int hw_do_start();
   virtual int hw_do_stop();
   virtual int hw_do_restart();

@@ -1,6 +1,6 @@
 #include "AlsaMinder.hpp"
 
-void AlsaMinder::hw_delete_privates() {
+void AlsaMinder::delete_privates() {
   if (pcm) {
     snd_pcm_drop(pcm);
     snd_pcm_close(pcm);
@@ -93,6 +93,7 @@ AlsaMinder::AlsaMinder(const string &devName, int rate, unsigned int numChan, co
 };
 
 AlsaMinder::~AlsaMinder() {
+  delete_privates();
 };
 
 int AlsaMinder::hw_getNumPollFDs () {

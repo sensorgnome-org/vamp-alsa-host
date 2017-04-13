@@ -105,7 +105,6 @@ protected:
   DevMinder(const string &devName, int rate, unsigned int numChan, unsigned int maxSampleAbs, const string &label, double now, int buffSize); // buffSize is in frames.
 
   void delete_privates();
-  virtual void hw_delete_privates() = 0;
 
   int do_start(double timeNow);
   virtual int hw_do_start() = 0;      // returns 0 on success; non-zero otherwise

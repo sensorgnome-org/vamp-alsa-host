@@ -1,6 +1,6 @@
 CCOPTS_PRODUCTION := -DRPI -I. -g -O3 -Wall -fPIC -ftree-vectorize -ffast-math -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
-CCOPTS_DEBUG      := -DRPI -I. -g3 -Wall -fPIC -ftree-vectorize -ffast-math -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=hard
+CCOPTS_DEBUG      := -DRPI -I. -g3 -O -Wall -fPIC -ftree-vectorize -ffast-math -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
 CCOPTS := $(CCOPTS_PRODUCTION)
 #CCOPTS := $(CCOPTS_DEBUG)
