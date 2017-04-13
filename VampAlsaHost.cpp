@@ -205,6 +205,18 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       PollableSet::iterator ip = Pollable::pollables.find(pluginLabel);
       if (ip == Pollable::pollables.end())
         throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
+      shared_ptr < PluginRunner > spr = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
+      PluginRunner * pr = spr.get();
+      if (pr) {
+        PollableSet::iterator jp = Pollable::pollables.find(pr->devLabel);
+        if (jp != Pollable::pollables.end()) {
+          shared_ptr < DevMinder > sdm = boost::dynamic_pointer_cast < DevMinder > (jp->second);
+          DevMinder *dm = sdm.get();
+          if (dm) {
+            dm->removeRawListener(pluginLabel);
+          }
+        }
+      };
       Pollable::pollables.erase(ip);
       reply << "{\"message\": \"Plugin " << pluginLabel << " has been detached.\"}\n";
     } catch (std::runtime_error e) {
