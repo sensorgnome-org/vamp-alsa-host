@@ -16,7 +16,9 @@ void DevMinder::delete_privates() {
 };
 
 int DevMinder::open() {
-  return hw_open();
+  int rv = hw_open();
+  downSampleFactor = hwRate / rate;
+  return rv;
 };
 
 void DevMinder::do_stop(double timeNow) {

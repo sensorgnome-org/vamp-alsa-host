@@ -185,7 +185,5 @@ RTLSDRMinder::getHWRateForRate(int rate) {
       break;
     hwRate += rate;
   }
-
-  downSampleFactor = hwRate / rate;
   return 0;
 };
