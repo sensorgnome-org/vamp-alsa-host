@@ -68,6 +68,10 @@ int AlsaMinder::hw_do_stop() {
   return 0;
 };
 
+bool AlsaMinder::hw_running(double timeNow) {
+  return pcm && snd_pcm_state(pcm) == SND_PCM_STATE_RUNNING;
+};
+
 int AlsaMinder::hw_do_start() {
   if (!pcm && open())
     return 1;

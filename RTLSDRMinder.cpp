@@ -37,6 +37,10 @@ int RTLSDRMinder::hw_do_stop() {
   return 0;
 };
 
+bool RTLSDRMinder::hw_running(double timeNow) {
+  return rtltcp > 0 && timeNow - lastDataReceived < 2.0;
+};
+
 int RTLSDRMinder::hw_do_start() {
   if (rtltcp < 0 && open())
     return 1;

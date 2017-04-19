@@ -21,43 +21,36 @@ int DevMinder::open() {
   return rv;
 };
 
-void DevMinder::do_stop(double timeNow) {
+void DevMinder::stop(double timeNow) {
+  shouldBeRunning = false;
   Pollable::requestPollFDRegen();
   hw_do_stop();
   stopTimestamp = timeNow;
   stopped = true;
 };
 
-void DevMinder::stop(double timeNow) {
-  shouldBeRunning = false;
-  do_stop(timeNow);
-};
+int DevMinder::do_restart(double timeNow) {
+  hasError = 0;
+  startTimestamp = timeNow;
+  return hw_do_restart();
+}
 
-int DevMinder::do_start(double timeNow) {
+int DevMinder::start(double timeNow) {
+  shouldBeRunning = true;
+  if (hw_running(timeNow))
+    return 0;
   if (!hw_is_open() && hw_open())
     return 1;
   Pollable::requestPollFDRegen();
-  hw_do_start();
-  if (! hasError) {
+  int rv = hw_do_start();
+  if (! rv) {
     stopped = false;
     // set timestamps to:
     // - prevent warning about resuming after long pause
     // - allow us to notice no data has been received for too long after startup
     lastDataReceived = startTimestamp = timeNow;
   }
-  return 0;
-}
-
-int DevMinder::do_restart(double timeNow) {
-  hasError = 0;
-  startTimestamp = timeNow;
-  return hw_do_restart();
-
-}
-
-int DevMinder::start(double timeNow) {
-  shouldBeRunning = true;
-  return do_start(timeNow);
+  return rv;
 };
 
 void DevMinder::addPluginRunner(std::string &label, shared_ptr < PluginRunner > pr) {

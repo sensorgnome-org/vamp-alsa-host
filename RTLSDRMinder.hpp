@@ -69,6 +69,7 @@ protected:
   virtual int hw_do_start();
   virtual int hw_do_stop();
   virtual int hw_do_restart();
+  virtual bool hw_running(double timeNow);
 
   int getHWRateForRate(int rate); // get minimum sampling rate that is an integer multiple of desired rate; this is the hardware
   // sampling rate that nodejs would have set for this rtlsdr device

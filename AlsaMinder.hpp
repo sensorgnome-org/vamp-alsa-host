@@ -53,7 +53,7 @@ protected:
   virtual int hw_do_start();
   virtual int hw_do_stop();
   virtual int hw_do_restart();
-
+  virtual bool hw_running(double timeNow);
 };
 
 #endif // ALSAMINDER_HPP

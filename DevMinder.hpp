@@ -106,14 +106,14 @@ protected:
 
   void delete_privates();
 
-  int do_start(double timeNow);
   virtual int hw_do_start() = 0;      // returns 0 on success; non-zero otherwise
 
   int do_restart(double timeNow);
   virtual int hw_do_restart() = 0;    // returns 0 on success; non-zero otherwise
 
-  void do_stop(double timeNow);
   virtual int hw_do_stop() = 0;       // returns 0 on success; non-zero otherwise
+
+  virtual bool hw_running(double timeNow) = 0;      // is device running?
 
 };
 
