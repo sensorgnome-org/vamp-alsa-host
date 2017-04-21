@@ -158,7 +158,7 @@ int RTLSDRMinder::hw_getFrames (int16_t *buf, int numFrames, double & frameTimes
       int16_t * ebuf = buf + (bytes - 1);
       unsigned char * cbuf = ((unsigned char *) buf) + (bytes - 1);
       for ( int i = bytes; i > 0; --i, --cbuf, --ebuf)
-        *ebuf = ((int16_t) (*cbuf - 127)) * SAMPLE_SCALE; // scale from 8 to 16 bits, improving precision of averaging downsampling
+        *ebuf = ((int16_t) (int8_t) (*cbuf - 128)) * SAMPLE_SCALE; // scale from 8 to 16 bits, improving precision of averaging downsampling
 
       bytesAvail -= bytes;
       segi +=  bytes;
