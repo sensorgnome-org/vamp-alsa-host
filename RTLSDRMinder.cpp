@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <arpa/inet.h>
 #include <time.h>
-#include <unistd.h>
 
 #define UNIX_PATH_MAX 108
 
@@ -154,42 +153,12 @@ int RTLSDRMinder::hw_getFrames (int16_t *buf, int numFrames, double & frameTimes
       if (bytes != dataBytes)
         std::cerr << "Bytes = " << bytes << " but dataBytes = " << dataBytes << std::endl;
 
-      // Note: the rtlsdr seems to provide its IQ byte stream with Q preceding I for each frame; see
-      // https://github.com/jbrzusto/sensorgnome/issues/25
-      //
-      // So to make this match the funcube's interleaved left/right
-      // I/Q samples as delivered by ALSA, we swap I and Q here.
-      // swab() doesn't work in-place, so copy from lower to upper
-      // half of buffer.
-      // i.e. go from
-      //
-      //    qiqiqi...qixxxxxxxxxxx
-      //    <--bytes--><--bytes-->
-      //
-      // to
-      //
-      //    xxxxxxxxxxxiqiqiq...iq
-      //    <--bytes--><--bytes-->
-      //
-      // and then to
-      //
-      //    IIQQIIQQIIQQ...IIQQ
-      //    <--  2 * bytes  -->
-      //
-      // where:
-      // i, q: 8 bit samples
-      // II, QQ: 16-bit samples
-      // x: don't care
-
-      swab(buf, (unsigned char *) buf + bytes, bytes);
-
-      // expand the samples from 8 to 16 bits working left to right;
-      // also, shift left 8 bits so sample downsampling using average
-      // method maintains more precision.
-
-      unsigned char * cbuf = ((unsigned char *) buf) + bytes;
-      for ( int i = 0; i < bytes; ++i, ++cbuf)
-        buf[i] = ((int16_t) *cbuf - 127) * SAMPLE_SCALE; // scale from 8 to 16 bits, improving precision of averaging downsampling
+      // expand the samples from 8 to 16 bits
+      // working from right to left; also, shift left 8 bits so sample downsampling using average method maintains more precision.
+      int16_t * ebuf = buf + (bytes - 1);
+      unsigned char * cbuf = ((unsigned char *) buf) + (bytes - 1);
+      for ( int i = bytes; i > 0; --i, --cbuf, --ebuf)
+        *ebuf = ((int16_t) (*cbuf - 127)) * SAMPLE_SCALE; // scale from 8 to 16 bits, improving precision of averaging downsampling
 
       bytesAvail -= bytes;
       segi +=  bytes;
