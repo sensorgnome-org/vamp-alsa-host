@@ -291,6 +291,7 @@ string PluginRunner::toJSON() {
   s << "{"
     << "\"type\":\"PluginRunner\","
     << "\"devLabel\":\"" << devLabel << "\","
+    << "\"rate\":" << rate << ","
     << "\"libraryName\":\"" << pluginSOName << "\","
     << "\"pluginID\":\"" << pluginID << "\","
     << "\"pluginOutput\":\"" << pluginOutput << "\","
