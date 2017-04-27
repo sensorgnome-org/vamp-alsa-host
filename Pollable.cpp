@@ -89,8 +89,7 @@ Pollable::poll(int timeout) {
     int i = ptr->indexInPollFD;
     if (i < 0)
       continue;
-    if (timedOut || allpollfds[i].revents)
-      ptr->handleEvents(&allpollfds[i], timedOut, VampAlsaHost::now());
+    ptr->handleEvents(&allpollfds[i], timedOut, VampAlsaHost::now());
     if (regen_pollfds)
       break;
   }
