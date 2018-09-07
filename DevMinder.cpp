@@ -284,7 +284,8 @@ void DevMinder::handleEvents ( struct pollfd *pollfds, bool timedOut, double tim
         plugins.erase(to_delete);
       }
     }
-  } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_DEV_QUIET_TIME) {
+  } else if (shouldBeRunning && lastDataReceived >= 0 && timeNow - lastDataReceived > MAX_DEV_QUIET_TIME
+             && ! (timeNow > 1000000000 && lastDataReceived < 1000000000)) {
     // this device appears to have stopped delivering audio; try restart it
     std::ostringstream msg;
     msg << "\"event\":\"devStalled\",\"error\":\"no data received for " << (timeNow - lastDataReceived) << " secs;\",\"devLabel\":\"" << label << "\"";
