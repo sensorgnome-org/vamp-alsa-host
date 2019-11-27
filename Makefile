@@ -1,10 +1,14 @@
-CCOPTS_PRODUCTION := -I. -O3 -Wall -fPIC -ftree-vectorize -ffast-math
-CCOPTS_DEBUG      := -I. -g3 -Wall -fPIC -ftree-vectorize -ffast-math
+CCOPTS := -DRPI -I. -Wall -fPIC -ftree-vectorize -ffast-math -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=hard
 
-CCOPTS := $(CCOPTS_PRODUCTION)
-#CCOPTS := $(CCOPTS_DEBUG)
+CXX := g++
+
+.PHONY: all clean debug install
 
 all: vamp-alsa-host
+all: CCOPTS += -g -O3
+  
+debug: vamp-alsa-host
+debug: CCOPTS += -g3 -O
 
 clean:
 	rm -f *.o vamp-alsa-host
@@ -12,53 +16,46 @@ clean:
 install: vamp-alsa-host
 	strip vamp-alsa-host
 	cp vamp-alsa-host /usr/bin
-	cp vamp-host /usr/bin
 
 AlsaMinder.o: AlsaMinder.cpp
-	g++ $(CCOPTS) -c -o $@ $<
+	$(CXX) $(CCOPTS) -c -o $@ $<
 
 RTLSDRMinder.o: RTLSDRMinder.cpp
-	g++ $(CCOPTS) -c -o $@ $<
+	$(CXX) $(CCOPTS) -c -o $@ $<
+
+DevMinder.o: DevMinder.cpp
+	$(CXX) $(CCOPTS) -c -o $@ $<
 
 PluginRunner.o: PluginRunner.cpp
-	g++ $(CCOPTS) -c -o $@ $<
+	$(CXX) $(CCOPTS) -c -o $@ $<
 
 Pollable.o: Pollable.cpp
-	g++ $(CCOPTS) -c -o $@ $<
+	$(CXX) $(CCOPTS) -c -o $@ $<
 
 VampAlsaHost.o: VampAlsaHost.cpp
-	g++ $(CCOPTS) -c -o $@ $<
+	$(CXX) $(CCOPTS) -c -o $@ $<
 
 TCPListener.o: TCPListener.cpp
-	g++ $(CCOPTS) -c -o $@ $<
+	$(CXX) $(CCOPTS) -c -o $@ $<
 
 TCPConnection.o: TCPConnection.cpp
-	g++ $(CCOPTS) -c -o $@ $<
+	$(CXX) $(CCOPTS) -c -o $@ $<
 
 WavFileWriter.o: WavFileWriter.cpp
-	g++ $(CCOPTS) -c -o $@ $<
+	$(CXX) $(CCOPTS) -c -o $@ $<
 
 vamp-alsa-host.o: vamp-alsa-host.cpp
-	g++ $(CCOPTS) -c -o $@ $<
+	$(CXX) $(CCOPTS) -c -o $@ $<
 
-vamp-host.o: vamp-host.cpp
-	g++  $(CCOPTS) -c -o $@ $<
-
-vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o PluginRunner.o VampAlsaHost.o AlsaMinder.o RTLSDRMinder.o WavFileWriter.o
-	g++ $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk -lboost_filesystem -lboost_system -lboost_thread
-
-vamp-host: vamp-host.o
-	g++  -o $@ $^ -lvamp-hostsdk -lsndfile -ldl
-
-vamp-host: vamp-host.o
-	g++  -o $@ $^ -lvamp-hostsdk -lsndfile -ldl
+vamp-alsa-host:  vamp-alsa-host.o TCPListener.o TCPConnection.o Pollable.o PluginRunner.o VampAlsaHost.o AlsaMinder.o WavFileWriter.o DevMinder.o RTLSDRMinder.o
+	$(CXX) $(CCOPTS) -o $@ $^ -lasound -lm -ldl -lrt -lvamp-hostsdk -lboost_filesystem -lboost_system -lboost_thread -lfftw3f
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
 AlsaMinder.o: AlsaMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp DevMinder.hpp
 AlsaMinder.o: ParamSet.hpp
-RTLSDRMinder.o: RTLSDRMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp DevMinder.hpp
-RTLSDRMinder.o: ParamSet.hpp
+DevMinder.o: DevMinder.hpp Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp
+DevMinder.o: ParamSet.hpp
 PluginRunner.o: PluginRunner.hpp ParamSet.hpp Pollable.hpp VampAlsaHost.hpp
 PluginRunner.o: AlsaMinder.hpp
 TCPConnection.o: TCPConnection.hpp Pollable.hpp VampAlsaHost.hpp
@@ -68,8 +65,9 @@ VampAlsaHost.o: VampAlsaHost.hpp Pollable.hpp AlsaMinder.hpp PluginRunner.hpp
 VampAlsaHost.o: ParamSet.hpp WavFileWriter.hpp
 vamp-alsa-host.o: ParamSet.hpp Pollable.hpp VampAlsaHost.hpp TCPListener.hpp
 vamp-alsa-host.o: TCPConnection.hpp PluginRunner.hpp AlsaMinder.hpp
-vamp-host.o: system.h
 WavFileWriter.o: WavFileWriter.hpp Pollable.hpp VampAlsaHost.hpp
+AlsaMinder.o: Pollable.hpp VampAlsaHost.hpp PluginRunner.hpp ParamSet.hpp
+AlsaMinder.o: AlsaMinder.hpp
 PluginRunner.o: ParamSet.hpp Pollable.hpp VampAlsaHost.hpp AlsaMinder.hpp
 PluginRunner.o: PluginRunner.hpp
 Pollable.o: VampAlsaHost.hpp
