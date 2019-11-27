@@ -166,7 +166,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       if (Pollable::lookupByName(pluginLabel))
         throw std::runtime_error(string("There is already a device or plugin with label '") + pluginLabel + "'");
       new PluginRunner(pluginLabel, devLabel, dev->rate, dev->numChan, dev->maxSampleAbs, pluginLib, pluginName, outputName, ps);
-      shared_ptr < PluginRunner > plugin = static_pointer_cast < PluginRunner > (Pollable::lookupByNameShared(pluginLabel));
+      boost::shared_ptr < PluginRunner > plugin = boost::static_pointer_cast < PluginRunner > (Pollable::lookupByNameShared(pluginLabel));
       dev->addPluginRunner(pluginLabel, plugin);
       if (! plugin->addOutputListener(defaultOutputListener))
         // the default output listener doesn't seem to exist any longer
@@ -191,7 +191,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       PollableSet::iterator ip = Pollable::pollables.find(pluginLabel);
       if (ip == Pollable::pollables.end())
         throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
-      shared_ptr < PluginRunner > p = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
+      boost::shared_ptr < PluginRunner > p = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
       PluginRunner * ptr = p.get();
       if (ptr)
         ptr->setParameters(ps);
@@ -205,12 +205,12 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       PollableSet::iterator ip = Pollable::pollables.find(pluginLabel);
       if (ip == Pollable::pollables.end())
         throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
-      shared_ptr < PluginRunner > spr = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
+      boost::shared_ptr < PluginRunner > spr = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
       PluginRunner * pr = spr.get();
       if (pr) {
         PollableSet::iterator jp = Pollable::pollables.find(pr->devLabel);
         if (jp != Pollable::pollables.end()) {
-          shared_ptr < DevMinder > sdm = boost::dynamic_pointer_cast < DevMinder > (jp->second);
+          boost::shared_ptr < DevMinder > sdm = boost::dynamic_pointer_cast < DevMinder > (jp->second);
           DevMinder *dm = sdm.get();
           if (dm) {
             dm->removeRawListener(pluginLabel);
@@ -229,7 +229,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       PollableSet::iterator ip = Pollable::pollables.find(pluginLabel);
       if (ip == Pollable::pollables.end())
         throw std::runtime_error(string("There is no attached plugin with label '") + pluginLabel + "'");
-      shared_ptr < PluginRunner > p = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
+      boost::shared_ptr < PluginRunner > p = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
       PluginRunner * ptr = p.get();
       if (ptr)
         ptr->addOutputListener(connLabel);
@@ -238,7 +238,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     };
   } else if (word == "receiveAll") {
     for (PollableSet::iterator ip = Pollable::pollables.begin(); ip != Pollable::pollables.end(); ++ip) {
-      shared_ptr < PluginRunner > p = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
+      boost::shared_ptr < PluginRunner > p = boost::dynamic_pointer_cast < PluginRunner > (ip->second);
       PluginRunner * ptr = p.get();
       if (ptr)
         ptr->addOutputListener(connLabel);

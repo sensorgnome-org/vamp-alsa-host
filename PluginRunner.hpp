@@ -12,6 +12,7 @@
 #include <set>
 #include <memory>
 #include <fftw3.h>
+#include <cstring>
 
 using namespace Vamp;
 using namespace Vamp::HostExt;
@@ -19,7 +20,7 @@ using namespace Vamp::HostExt;
 #include "ParamSet.hpp"
 #include "Pollable.hpp"
 
-typedef std::map < string, weak_ptr < Pollable > > OutputListenerSet;
+typedef std::map < std::string, boost::weak_ptr < Pollable > > OutputListenerSet;
 
 class PluginRunner : public Pollable {
 public:

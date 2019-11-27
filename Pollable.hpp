@@ -15,15 +15,15 @@
 #include <boost/weak_ptr.hpp>
 #include <boost/make_shared.hpp>
 
-using boost::make_shared;
-using boost::shared_ptr;
-using boost::weak_ptr;
-using boost::static_pointer_cast;
+//using boost::make_shared;
+//using boost::shared_ptr;
+//using boost::weak_ptr;
+//using boost::static_pointer_cast;
 
 #include "VampAlsaHost.hpp"
 
 class Pollable;
-typedef std::map < std::string, shared_ptr < Pollable > > PollableSet;
+typedef std::map < std::string, boost::shared_ptr<Pollable> > PollableSet;
 
 class Pollable {
 public:
@@ -35,7 +35,7 @@ public:
   static PollableSet pollables; // map of Pollables, indexed by label, values are shared pointers
   static void remove(const string label);
   static Pollable * lookupByName (const std::string& label);
-  static shared_ptr < Pollable > lookupByNameShared (const std::string& label);
+  static boost::shared_ptr < Pollable > lookupByNameShared (const std::string& label);
   static void requestPollFDRegen();
   static int poll(int timeout); // do one round of polling; return 0 on okay; errno otherwise
   static void setControlSocket(string label);

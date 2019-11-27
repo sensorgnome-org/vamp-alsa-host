@@ -7,7 +7,7 @@ Pollable::Pollable(const std::string label) :
   outputBuffer(DEFAULT_OUTPUT_BUFFER_SIZE)
 {
   pollfd.fd = -1;
-  pollables[label] = shared_ptr < Pollable > (this);
+  pollables[label] = boost::shared_ptr < Pollable > (this);
   regen_pollfds = true;
 };
 
@@ -21,7 +21,7 @@ Pollable::remove(const std::string label) {
     return;
   if (! pollables.count(label))
     return;
-  shared_ptr < Pollable > p = pollables[label];
+  boost::shared_ptr < Pollable > p = pollables[label];
   Pollable * pp = p.get();
   if (!pp) {
     pollables.erase(label);
@@ -45,10 +45,10 @@ Pollable::lookupByName (const std::string& label) {
   return pollables[label].get();
 };
 
-shared_ptr < Pollable >
+boost::shared_ptr < Pollable >
 Pollable::lookupByNameShared (const std::string& label) {
   if (pollables.count(label) == 0)
-    return shared_ptr < Pollable > ((Pollable *) 0);
+    return boost::shared_ptr < Pollable > ((Pollable *) 0);
   return pollables[label];
 };
 

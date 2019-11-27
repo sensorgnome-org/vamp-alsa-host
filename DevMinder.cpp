@@ -53,7 +53,7 @@ int DevMinder::start(double timeNow) {
   return rv;
 };
 
-void DevMinder::addPluginRunner(std::string &label, shared_ptr < PluginRunner > pr) {
+void DevMinder::addPluginRunner(std::string &label, boost::shared_ptr < PluginRunner > pr) {
   plugins[label] = pr;
 };
 
@@ -64,7 +64,7 @@ void DevMinder::removePluginRunner(std::string &label) {
 
 void DevMinder::addRawListener(string &label, int downSampleFactor, bool writeWavHeader, bool downSampleUseAvg) {
 
-  shared_ptr < Pollable > sptr;
+  boost::shared_ptr < Pollable > sptr;
   rawListeners[label] = sptr = Pollable::lookupByNameShared(label);
   if (rawListeners.size() == 1) {
     this->downSampleFactor = downSampleFactor;

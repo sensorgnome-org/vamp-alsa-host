@@ -46,7 +46,7 @@ protected:
   char cmdString[VampAlsaHost::MAX_CMD_STRING_LENGTH + 1];    // buffer for input from TCP
   string inputBuff;   // input from TCP socket which has not been processed yet
 
-  weak_ptr < Pollable > outputListener;
+  boost::weak_ptr < Pollable > outputListener;
   double timeConnected;
 
 };

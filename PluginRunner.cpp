@@ -153,7 +153,7 @@ PluginRunner::~PluginRunner() {
 
 bool PluginRunner::addOutputListener(string label) {
 
-  shared_ptr < Pollable > outl = boost::static_pointer_cast < Pollable > (lookupByNameShared(label));
+  boost::shared_ptr < Pollable > outl = boost::static_pointer_cast < Pollable > (lookupByNameShared(label));
   if (outl) {
     outputListeners[label] = outl;
     return true;
@@ -236,7 +236,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
     if (isOutputBinary) {
       // copy values as raw bytes to any outputListeners
       for (OutputListenerSet::iterator io = outputListeners.begin(); io != outputListeners.end(); /**/) {
-        if (shared_ptr < Pollable > ptr = (io->second).lock()) {
+        if (boost::shared_ptr < Pollable > ptr = (io->second).lock()) {
           ptr->queueOutput((char *)& f->values[0], f->values.size() * sizeof(f->values[0]));
           ++io;
         } else {
@@ -273,7 +273,7 @@ PluginRunner::outputFeatures(Plugin::FeatureSet features, string prefix)
 
       // send output as text to any outputListeners
       for (OutputListenerSet::iterator io = outputListeners.begin(); io != outputListeners.end(); /**/) {
-        if (shared_ptr < Pollable > ptr = (io->second).lock()) {
+        if (boost::shared_ptr < Pollable > ptr = (io->second).lock()) {
           string output = txt.str();
           ptr->queueOutput(output);
           ++io;
