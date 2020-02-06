@@ -133,7 +133,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
     try {
       DevMinder * ptr = DevMinder::getDevMinder(alsaDev, rate, numChan, label, realTimeNow);
       reply << ptr->toJSON() << '\n';
-    } catch (std::runtime_error e) {
+    } catch (std::runtime_error& e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
     };
   } else if (word == "close") {
@@ -173,7 +173,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
         // so reset its name in case a subsequent connection has the same label
         defaultOutputListener = "";
       reply << plugin->toJSON() << '\n';
-    } catch (std::runtime_error e) {
+    } catch (std::runtime_error& e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
     };
   } else if (word == "param") {
@@ -195,7 +195,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       PluginRunner * ptr = p.get();
       if (ptr)
         ptr->setParameters(ps);
-    } catch (std::runtime_error e) {
+    } catch (std::runtime_error& e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
     };
   } else if (word == "detach") {
@@ -219,7 +219,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       };
       Pollable::pollables.erase(ip);
       reply << "{\"message\": \"Plugin " << pluginLabel << " has been detached.\"}\n";
-    } catch (std::runtime_error e) {
+    } catch (std::runtime_error& e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
     };
   } else if (word == "receive") {
@@ -233,7 +233,7 @@ string VampAlsaHost::runCommand(string cmdString, string connLabel) {
       PluginRunner * ptr = p.get();
       if (ptr)
         ptr->addOutputListener(connLabel);
-    } catch (std::runtime_error e) {
+    } catch (std::runtime_error& e) {
       reply << "{\"error\": \"Error:" << e.what() << "\"}\n";
     };
   } else if (word == "receiveAll") {

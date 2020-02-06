@@ -266,7 +266,7 @@ main(int argc, char **argv)
     int rv = 0;
     try {
         rv = host->run();
-    } catch (std::runtime_error e) {
+    } catch (std::runtime_error& e) {
         std::cerr << "vamp-alsa-host terminated\nWhy: " << e.what();
     };
     exit(rv);
